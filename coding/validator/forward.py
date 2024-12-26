@@ -64,9 +64,14 @@ async def process_response(uid: int, async_generator: Awaitable):
         if chunk is not None:
             synapse = chunk  # last object yielded is the synapse itself with completion filled
 
+            # bt.logging.debug(f"process_time: synapse.dendrite.process_time}")
             # Assuming chunk holds the last value yielded which should be a synapse
             if isinstance(synapse, StreamCodeSynapse):
                 return synapse
+            else:
+                raise ValueError(
+                    f"Expected a StreamCodeSynapse but received {type(synapse)}"
+                )
 
         bt.logging.debug(
             f"Synapse is not StreamCodeSynapse. Miner uid {uid} completion set to '' "
@@ -83,10 +88,6 @@ async def process_response(uid: int, async_generator: Awaitable):
         )
 
         return failed_synapse
-    finally:
-        return StreamCodeSynapse(
-            completion=buffer
-        )
 
 
 async def handle_response(responses: Dict[int, Awaitable]) -> List[StreamResult]:
