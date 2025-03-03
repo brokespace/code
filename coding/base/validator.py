@@ -18,6 +18,7 @@
 import os
 import sys
 import copy
+import time
 import asyncio
 import argparse
 import threading
@@ -189,6 +190,7 @@ class BaseValidatorNeuron(BaseNeuron):
                 if self.step is None:
                     self.step = 0
                 self.step += 1
+                time.sleep(30)
 
         # If someone intentionally stops the validator, it'll safely terminate operations.
         except KeyboardInterrupt:

@@ -32,50 +32,51 @@ async def forward(self, synapse: EvaluationSynapse | None):
         synapse.alive = True
         return synapse
     
-    if not FinetunePipeline.tasks_exist(self.config):
-        FinetunePipeline.generate_tasks(self.config)
+    if self.last_finetune_eval_time + 25 < self.block:
+        if not FinetunePipeline.tasks_exist(self.config):
+            FinetunePipeline.generate_tasks(self.config)
 
-    if (
-        self.last_task_update + 10800 < self.block
-    ):  # every 1.5 days replace 50(half) the tasks
-        FinetunePipeline.update_tasks(self.config, 50, 100)
-        self.last_task_update = self.block
+        if (
+            self.last_task_update + 10800 < self.block
+        ):  # every 1.5 days replace 50(half) the tasks
+            FinetunePipeline.update_tasks(self.config, 50, 100)
+            self.last_task_update = self.block
 
-    if not hasattr(self, "finetune_eval_future") and self.last_finetune_eval_time + 25 < self.block:
-        delete_all_containers(os.getenv("REMOTE_DOCKER_HOST", None))
-        sleep(10)  # wait for containers to be truly deleted
-        finetune_pipeline = FinetunePipeline(
-            config=self.config,
-            use_remote=True,
-            coordinator=self.coordinator
+        if not hasattr(self, "finetune_eval_future"):
+            delete_all_containers(os.getenv("REMOTE_DOCKER_HOST", None))
+            sleep(10)  # wait for containers to be truly deleted
+            finetune_pipeline = FinetunePipeline(
+                config=self.config,
+                use_remote=True,
+                coordinator=self.coordinator
+            )
+            self.finetune_eval_future = self.executor.submit(finetune_pipeline.evaluate)
+        # Check if evaluation is complete
+        if hasattr(self, "finetune_eval_future") and self.finetune_eval_future.done():
+            self.finetune_results[COMPETITION_ID] = self.finetune_eval_future.result()
+            delattr(self, "finetune_eval_future")  # Remove the future after getting results
+
+        self.update_scores()
+
+        log_event(
+            self,
+            {
+                "step": self.step,
+                **(
+                    self.finetune_results[COMPETITION_ID].__state_dict__()
+                    if COMPETITION_ID in self.finetune_results
+                    else {}
+                ),
+            },
         )
-        self.finetune_eval_future = self.executor.submit(finetune_pipeline.evaluate)
+
+        # Call clean_wandb once every day
+        if self.last_wandb_clean + 7200 < self.block:
+            try:
+                clean_wandb(self)
+                self.last_wandb_clean = self.block
+            except Exception as e:
+                bt.logging.error(f"Error cleaning wandb: {e}")
         self.last_finetune_eval_time = self.block
-    # Check if evaluation is complete
-    if hasattr(self, "finetune_eval_future") and self.finetune_eval_future.done():
-        self.finetune_results[COMPETITION_ID] = self.finetune_eval_future.result()
-        delattr(self, "finetune_eval_future")  # Remove the future after getting results
-
-    self.update_scores()
-
-    log_event(
-        self,
-        {
-            "step": self.step,
-            **(
-                self.finetune_results[COMPETITION_ID].__state_dict__()
-                if COMPETITION_ID in self.finetune_results
-                else {}
-            ),
-        },
-    )
-
-    # Call clean_wandb once every day
-    if self.last_wandb_clean + 7200 < self.block:
-        try:
-            clean_wandb(self)
-            self.last_wandb_clean = self.block
-        except Exception as e:
-            bt.logging.error(f"Error cleaning wandb: {e}")
 
     return synapse
