@@ -10,7 +10,7 @@ from coding.utils.logging import log_event, clean_wandb
 from coding.finetune.dockerutil import delete_all_containers
 
 
-async def forward(self, synapse: EvaluationSynapse):
+async def forward(self, synapse: EvaluationSynapse | None):
     """
     The forward function is called by the validator every time step.
 
@@ -19,7 +19,8 @@ async def forward(self, synapse: EvaluationSynapse):
     Args:
         self (:obj:`bittensor.neuron.Neuron`): The neuron object which contains all the necessary state for the validator.
     """
-    if synapse:
+    bt.logging.info("🚀 Starting forward loop...")
+    if synapse is not None:
         status = self.coordinator.get_model_status(synapse.model_hash)
         if status:
             synapse.in_progress = status.in_progress
@@ -29,11 +30,8 @@ async def forward(self, synapse: EvaluationSynapse):
             synapse.completed_at = status.completed_at
             synapse.server_id = status.server_id
         synapse.alive = True
-    else:
-        synapse = EvaluationSynapse()
-        synapse.alive = False
-
-    bt.logging.info("🚀 Starting forward loop...")
+        return synapse
+    
     if not FinetunePipeline.tasks_exist(self.config):
         FinetunePipeline.generate_tasks(self.config)
 
