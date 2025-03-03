@@ -105,14 +105,14 @@ class Validator(BaseValidatorNeuron):
         """
         if synapse:
             status = self.coordinator.get_model_status(synapse.model_hash)
-        if status:
-            synapse.in_progress = status.in_progress
-            synapse.completed = status.completed
-            synapse.score = status.score
-            synapse.started_at = status.started_at
-            synapse.completed_at = status.completed_at
-        synapse.alive = True
-        return synapse
+            if status:
+                synapse.in_progress = status.in_progress
+                synapse.completed = status.completed
+                synapse.score = status.score
+                synapse.started_at = status.started_at
+                synapse.completed_at = status.completed_at
+            synapse.alive = True
+            return synapse
     
     async def forward(self, synapse: EvaluationSynapse) -> Awaitable:
         """
