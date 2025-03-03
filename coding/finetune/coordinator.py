@@ -21,6 +21,7 @@ class ModelEvaluationStatus(BaseModel):
     server_id: Optional[str] = None
     started_at: Optional[int] = None # block number
     completed_at: Optional[int] = None # block number
+    score: Optional[float] = None
 
 
 class FinetuneCoordinator:
