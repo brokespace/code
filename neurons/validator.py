@@ -98,7 +98,7 @@ class Validator(BaseValidatorNeuron):
         
         self.coordinator = FinetuneCoordinator(self.config, self.wallet)
 
-    async def _forward(
+    def _forward(
         self, synapse: EvaluationSynapse
     ) -> (
         EvaluationSynapse
