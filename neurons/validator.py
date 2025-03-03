@@ -111,6 +111,7 @@ class Validator(BaseValidatorNeuron):
                 synapse.score = status.score
                 synapse.started_at = status.started_at
                 synapse.completed_at = status.completed_at
+                synapse.server_id = status.server_id
             synapse.alive = True
             return synapse
     

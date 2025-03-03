@@ -57,7 +57,6 @@ class FinetuneCoordinator:
         Gather other servers that this coordinator can communicate with.
         """
         self.servers = []
-        bt.logging.info(f"Registered {len(self.servers)} servers: {self.servers}")
         for hotkey in HONEST_VALIDATOR_HOTKEYS:
             uid = get_uid_from_hotkey(self, hotkey)
             if uid is not None:
@@ -74,7 +73,8 @@ class FinetuneCoordinator:
                 except Exception as e:
                     bt.logging.warning(f"Failed to query {hotkey}: {e}")
                     continue
-    
+        bt.logging.info(f"Registered {len(self.servers)} servers: {self.servers}")
+        
     def get_status(self, model_hash: str) -> ModelEvaluationStatus:
         """
         Get the status of a model evaluation
@@ -212,19 +212,17 @@ class FinetuneCoordinator:
                 status.completed = True
                 status.completed_at = self.block
                 status.score = score
+                status.in_progress = False
                 self.evaluation_statuses[model_hash] = status
                 
-    def get_model_status(self, model_hash: str) -> ModelEvaluationStatus:
+    def get_model_status(self, model_hash: str) -> ModelEvaluationStatus | None:
         """Get the evaluation status for a model"""
         with self.lock:
             status = self.evaluation_statuses.get(model_hash, None)
             if status:
                 return status
             else:
-                return ModelEvaluationStatus(
-                    model_hash=model_hash,
-                    in_progress=False,
-                    completed=False)
+                return None
     
     def get_all_statuses(self):
         """Get all evaluation statuses"""
