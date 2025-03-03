@@ -19,7 +19,20 @@ async def forward(self, synapse: EvaluationSynapse):
     Args:
         self (:obj:`bittensor.neuron.Neuron`): The neuron object which contains all the necessary state for the validator.
     """
-    
+    if synapse:
+        status = self.coordinator.get_model_status(synapse.model_hash)
+        if status:
+            synapse.in_progress = status.in_progress
+            synapse.completed = status.completed
+            synapse.score = status.score
+            synapse.started_at = status.started_at
+            synapse.completed_at = status.completed_at
+            synapse.server_id = status.server_id
+        synapse.alive = True
+    else:
+        synapse = EvaluationSynapse()
+        synapse.alive = False
+
     bt.logging.info("🚀 Starting forward loop...")
     if not FinetunePipeline.tasks_exist(self.config):
         FinetunePipeline.generate_tasks(self.config)
@@ -30,7 +43,7 @@ async def forward(self, synapse: EvaluationSynapse):
         FinetunePipeline.update_tasks(self.config, 50, 100)
         self.last_task_update = self.block
 
-    if not hasattr(self, "finetune_eval_future"):
+    if not hasattr(self, "finetune_eval_future") and self.last_forward_time + 25 < self.block:
         delete_all_containers(os.getenv("REMOTE_DOCKER_HOST", None))
         sleep(10)  # wait for containers to be truly deleted
         finetune_pipeline = FinetunePipeline(
@@ -39,6 +52,7 @@ async def forward(self, synapse: EvaluationSynapse):
             coordinator=self.coordinator
         )
         self.finetune_eval_future = self.executor.submit(finetune_pipeline.evaluate)
+        self.last_finetune_eval_time = self.block
     # Check if evaluation is complete
     if hasattr(self, "finetune_eval_future") and self.finetune_eval_future.done():
         self.finetune_results[COMPETITION_ID] = self.finetune_eval_future.result()
@@ -66,4 +80,4 @@ async def forward(self, synapse: EvaluationSynapse):
         except Exception as e:
             bt.logging.error(f"Error cleaning wandb: {e}")
 
-    sleep(60 * 5)
+    return synapse

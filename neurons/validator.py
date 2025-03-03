@@ -27,6 +27,7 @@ import bittensor as bt
 from typing import Awaitable, Tuple
 from concurrent.futures import ThreadPoolExecutor
 
+from coding.validator.forward import forward
 from coding.protocol import EvaluationSynapse
 from coding.constants import HONEST_VALIDATOR_HOTKEYS
 # import base validator class which takes care of most of the boilerplate
@@ -36,6 +37,7 @@ from coding.utils.logging import init_wandb_if_not_exists
 from coding.finetune.coordinator import FinetuneCoordinator
 from coding.finetune.dockerutil import test_docker_container
 from coding.helpers.containers import DockerServer, test_docker_server
+
 
 class Validator(BaseValidatorNeuron):
     """
@@ -58,6 +60,7 @@ class Validator(BaseValidatorNeuron):
         self.load_state()
         if self.last_task_update == 0:
             self.last_task_update = self.block
+        self.last_finetune_eval_time = 0
         init_wandb_if_not_exists(self)
         # self.active_tasks = [
         #     task
@@ -103,21 +106,7 @@ class Validator(BaseValidatorNeuron):
         """
         forward method that is called when the validator is queried with an axon
         """
-        if synapse:
-            status = self.coordinator.get_model_status(synapse.model_hash)
-            if status:
-                synapse.in_progress = status.in_progress
-                synapse.completed = status.completed
-                synapse.score = status.score
-                synapse.started_at = status.started_at
-                synapse.completed_at = status.completed_at
-                synapse.server_id = status.server_id
-            synapse.alive = True
-            return synapse
-        else:
-            synapse = EvaluationSynapse()
-            synapse.alive = False
-            return synapse
+        return forward(self, synapse)
     
     async def forward(self, synapse: EvaluationSynapse) -> Awaitable:
         """
