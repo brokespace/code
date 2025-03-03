@@ -114,6 +114,10 @@ class Validator(BaseValidatorNeuron):
                 synapse.server_id = status.server_id
             synapse.alive = True
             return synapse
+        else:
+            synapse = EvaluationSynapse()
+            synapse.alive = False
+            return synapse
     
     async def forward(self, synapse: EvaluationSynapse) -> Awaitable:
         """
