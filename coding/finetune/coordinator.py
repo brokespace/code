@@ -100,7 +100,7 @@ class FinetuneCoordinator:
                         if response.alive and response.model_hash == model_hash and response.server_id == server and (response.in_progress or response.completed):
                             # Update our local status with the latest info
                             self.evaluation_statuses[model_hash] = ModelEvaluationStatus(
-                                hash=model_hash,
+                                model_hash=model_hash,
                                 in_progress=response.in_progress,
                                 completed=response.completed,
                                 server_id=server,
@@ -127,7 +127,7 @@ class FinetuneCoordinator:
                     if response.alive and response.model_hash == model_hash and response.server_id == server and (response.in_progress or response.completed):
                         # Store the server that's evaluating it
                         status = ModelEvaluationStatus(
-                            hash=model_hash,
+                            model_hash=model_hash,
                             in_progress=response.in_progress,
                             completed=response.completed,
                             server_id=server,
@@ -174,7 +174,7 @@ class FinetuneCoordinator:
             # No one is evaluating this model, or the previous evaluation was stalled,
             # so we'll do it
             self.evaluation_statuses[model_hash] = ModelEvaluationStatus(
-                hash=model_hash,
+                model_hash=model_hash,
                 in_progress=True,
                 completed=False,
                 server_id=self.server_id,
@@ -189,7 +189,7 @@ class FinetuneCoordinator:
         """
         with self.lock:
             self.evaluation_statuses[model_hash] = ModelEvaluationStatus(
-                hash=model_hash,
+                model_hash=model_hash,
                 in_progress=True,
                 completed=False,
                 server_id=self.server_id,
