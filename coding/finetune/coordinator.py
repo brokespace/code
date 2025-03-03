@@ -59,7 +59,7 @@ class FinetuneCoordinator:
         self.servers = []
         bt.logging.info(f"Registered {len(self.servers)} servers: {self.servers}")
         for hotkey in HONEST_VALIDATOR_HOTKEYS:
-            uid = get_uid_from_hotkey(hotkey)
+            uid = get_uid_from_hotkey(self, hotkey)
             if uid is not None:
                 synapse = EvaluationSynapse()
                 try:
@@ -92,7 +92,7 @@ class FinetuneCoordinator:
                     try:
                         synapse = EvaluationSynapse()
                         synapse.model_hash = model_hash
-                        uid = get_uid_from_hotkey(server)
+                        uid = get_uid_from_hotkey(self, server)
                         response = self.dendrite.query(
                             axons=self.metagraph.axons[uid],
                             synapse=synapse,
@@ -119,7 +119,7 @@ class FinetuneCoordinator:
                 try:
                     synapse = EvaluationSynapse()
                     synapse.model_hash = model_hash
-                    uid = get_uid_from_hotkey(server)
+                    uid = get_uid_from_hotkey(self, server)
                     response = self.dendrite.query(
                         axons=self.metagraph.axons[uid],
                         synapse=synapse,
