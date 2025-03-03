@@ -68,7 +68,7 @@ class FinetuneCoordinator:
                         timeout=10,
                         deserialize=False,
                     )
-                    if response.alive:
+                    if response and response.alive:
                         self.servers.append(hotkey)
                 except Exception as e:
                     bt.logging.warning(f"Failed to query {hotkey}: {e}")
@@ -79,6 +79,7 @@ class FinetuneCoordinator:
         """
         Get the status of a model evaluation
         """
+        self.gather_servers()
         with self.lock:
             # Check if we have a local status for this model
             if model_hash in self.evaluation_statuses:

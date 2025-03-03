@@ -43,7 +43,7 @@ async def forward(self, synapse: EvaluationSynapse):
         FinetunePipeline.update_tasks(self.config, 50, 100)
         self.last_task_update = self.block
 
-    if not hasattr(self, "finetune_eval_future") and self.last_forward_time + 25 < self.block:
+    if not hasattr(self, "finetune_eval_future") and self.last_finetune_eval_time + 25 < self.block:
         delete_all_containers(os.getenv("REMOTE_DOCKER_HOST", None))
         sleep(10)  # wait for containers to be truly deleted
         finetune_pipeline = FinetunePipeline(
