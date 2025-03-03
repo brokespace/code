@@ -15,7 +15,6 @@ from coding.constants import HONEST_VALIDATOR_HOTKEYS
 
 class ModelEvaluationStatus(BaseModel):
     """Status of a model evaluation"""
-    hotkey: str
     model_hash: str
     in_progress: bool
     completed: bool
