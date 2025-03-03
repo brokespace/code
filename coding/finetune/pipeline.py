@@ -142,6 +142,7 @@ class FinetunePipeline:
     ):
         self.config = config
         self.use_remote = use_remote
+        self.coordinator = coordinator
         try:
             bittensor_injector(self)
         except Exception as e:
