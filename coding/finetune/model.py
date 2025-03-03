@@ -1,6 +1,7 @@
 import json
 import difflib
 import logging
+import hashlib
 from pydantic import BaseModel
 from openai import OpenAI
 from tiktoken import encoding_for_model
@@ -8,7 +9,7 @@ from coding.helpers.codeanal import verify_code_usage, check_large_literals
 from coding.constants import ALLOWED_MODULES, NUM_ALLOWED_CHARACTERS, ALLOWED_IMPORTS
 
 
-def logic_similar(logic1: dict, logic2: dict, threshold: float = 0.9) -> bool:
+def logic_similar(logic1: dict, logic2: dict, threshold: float = 0.95) -> bool:
     return (
         difflib.SequenceMatcher(
             None, json.dumps(logic1, sort_keys=True), json.dumps(logic2, sort_keys=True)
@@ -45,7 +46,7 @@ def validate_logic(logic: dict):
     - A predefined list, dictionary, or comment explicitly enumerating files or issue descriptions (especially if hashed or encrypted) and associating them with diffs or edits or filenames or numbers that need to be performed.
     </Not allowed>
 
-    (The intent is to prevent “hardcoded solutions” that bypass the AI pipeline logic. General data structures for configurations, testing, or model references are acceptable, as long as they are not used to map specific files or issues to their required diffs or edits.)
+    (The intent is to prevent "hardcoded solutions" that bypass the AI pipeline logic. General data structures for configurations, testing, or model references are acceptable, as long as they are not used to map specific files or issues to their required diffs or edits.)
 
     # Context of the code
     
@@ -55,7 +56,7 @@ def validate_logic(logic: dict):
     2. Identifying the correct area within those files to edit.
     3. Performing the edit and generating the diff.
 
-    Finding the correct file might involve compression, parsing, searching, embedding, or other techniques. However, the file must not simply hardcode a table or dictionary that says “Issue #X => Diff for file Y at lines Z.”
+    Finding the correct file might involve compression, parsing, searching, embedding, or other techniques. However, the file must not simply hardcode a table or dictionary that says "Issue #X => Diff for file Y at lines Z."
 
     # Important reminders before marking a file as invalid
     
@@ -215,6 +216,7 @@ class Model(BaseModel):
     logic: dict
     valid: bool
     score: float | None = None
+    hash: str | None = None
 
 
 class ModelStore:
@@ -230,7 +232,8 @@ class ModelStore:
 
     def create_model(self, logic: dict, score: float | None = None) -> Model:
         valid, msg = validate_logic_threaded(logic)
-        return Model(logic=logic, valid=valid, score=score)
+        hash = hashlib.sha256(json.dumps(logic, sort_keys=True).encode()).hexdigest()
+        return Model(logic=logic, valid=valid, score=score, hash=hash)
 
     def upsert(self, logic: dict, score: float | None = None) -> Model:
         model = self.get(logic)
@@ -252,3 +255,4 @@ class ModelStore:
 
     def __contains__(self, logic: dict) -> bool:
         return self.get(logic) is not None
+

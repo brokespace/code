@@ -1,5 +1,7 @@
 import os
+import time
 import json
+import random
 import pickle
 import difflib
 import traceback
@@ -136,6 +138,7 @@ class FinetunePipeline:
         config,
         tracking_logics: List[TrackingInfo] = None,
         use_remote: bool = False,
+        coordinator = None
     ):
         self.config = config
         self.use_remote = use_remote
@@ -242,6 +245,10 @@ class FinetunePipeline:
                 ungraded_trackers.append(tracker)
         self.graded_trackers = graded_trackers
         self.ungraded_trackers = ungraded_trackers
+        for tracker in self.graded_trackers:
+            model = self.model_store.get(tracker.logic)
+            if model:
+                self.coordinator.mark_evaluation_started(model.hash)
         self.store_model_store()
         print(
             f"Loaded {len(self.graded_trackers)} graded and {len(self.ungraded_trackers)} ungraded trackers"
@@ -265,6 +272,8 @@ class FinetunePipeline:
                 continue
             bt.logging.info(f"Logic for hotkey {tracker.hotkey} passed verification.")
         bt.logging.info(f"Beginning evaluation of {len(self.tasks)} tasks...")
+        random.shuffle(self.ungraded_trackers)
+        remote_graded_trackers = []
         for tracker_idx, tracker in enumerate(self.ungraded_trackers):
             bt.logging.info(
                 f"Processing tracker {tracker_idx + 1}/{len(self.ungraded_trackers)}"
@@ -282,7 +291,11 @@ class FinetunePipeline:
                 )
                 self.graded_trackers.append(tracker)
                 continue
-
+            model = self.model_store.upsert(tracker.logic)
+            if not self.coordinator.should_evaluate_model(model.hash):
+                remote_graded_trackers.append(tracker)
+                continue
+            
             previous_tracker = next(
                 (
                     t
@@ -312,9 +325,11 @@ class FinetunePipeline:
                 self.graded_trackers.append(tracker)
                 # if tracker.hotkey != previous_tracker.hotkey:
                 # self.trackers.append(tracker)
+                self.coordinator.mark_evaluation_complete(model.hash, tracker.score)
                 continue
 
             # Otherwise, evaluate the logic
+            self.coordinator.mark_evaluation_started(model.hash)
             bt.logging.info(f"Initializing LLM key for hotkey {tracker.hotkey}...")
             self.llm_manager.init_key(tracker.hotkey)
             bt.logging.info(f"Starting docker container for hotkey {tracker.hotkey}...")
@@ -416,11 +431,28 @@ class FinetunePipeline:
 
             bt.logging.info(f"Cleaning up container for hotkey {tracker.hotkey}...")
             bt.logging.info(f"Final score for hotkey {tracker.hotkey}: {tracker.score}")
-
+            self.coordinator.mark_evaluation_complete(model.hash, tracker.score)
         bt.logging.info("Evaluation complete!")
         if store_results:
             self.store_trackers()
-
+        
+        # Wait for all evaluations to complete
+        while True:
+            statuses = self.coordinator.get_all_statuses()
+            if all(status.completed for status in statuses):
+                break
+            bt.logging.info("Waiting for all evaluations to complete...")
+            time.sleep(60)
+        
+        for tracker in remote_graded_trackers:
+            model = self.model_store.get(tracker.logic)
+            model_status = self.coordinator.get_model_status(model.hash)
+            tracker.score = model_status.score
+            tracker.score_timestamps.append(model_status.completed_at)
+            self.graded_trackers.append(tracker)
+            if store_results:
+                self.store_trackers()
+        
         return self.results
 
     def __str__(self):

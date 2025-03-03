@@ -32,29 +32,48 @@ from coding.constants import COMPETITION_ID
 
 class LogicSynapse(bt.Synapse):
     """
-    LogicSynapse is a Synapse that is used to get the logic of the miner. 
-    
+    LogicSynapse is a Synapse that is used to get the logic of the miner.
+
     Attributes:
         logic (dict): A dictionary where the key is a filename and the value is the file contents
     """
+
     logic: dict = pydantic.Field(
         {},
         title="logic",
         description="A dictionary where the key is a filename and the value is the file contents",
     )
 
+class EvaluationSynapse(bt.Synapse):
+    """
+    EvaluationSynapse is a Synapse that is used to get the evaluation of the miner.
+
+    Attributes:
+    """
+
+    model_hash: Optional[str] = None
+    in_progress: Optional[bool] = None
+    completed: Optional[bool] = None
+    server_id: Optional[str] = None
+    started_at: Optional[int] = None
+    completed_at: Optional[int] = None
+    score: Optional[float] = None
+    alive: Optional[bool] = None
+
+
 class HFModelSynapse(bt.Synapse):
     """
     HFModelSynapse is a Synapse that is used to get the HF model name that this miner published to HF
-    
+
     Attributes:
         model_name (Optional[str]): The HF model name that this miner published to HF
         prompt_tokens (Optional[dict]): Dictionary containing FIM prompt tokens:
             - "prefix": the prefix of the prompt
             - "middle": the middle of the prompt
             - "suffix": the suffix of the prompt
-        
+
     """
+
     model_name: Optional[str] = ""
     competition_id: Optional[int] = COMPETITION_ID
     # prompt_tokens: Optional[dict] = None
@@ -96,28 +115,24 @@ class StreamCodeSynapse(bt.StreamingSynapse):
     subclasses to further customize behavior for specific prompting scenarios or requirements.
     """
 
-
-    
-
-    
     query: str = pydantic.Field(
         "",
         title="query",
         description="The query",
     )
-    
+
     script: str = pydantic.Field(
         "",
         title="script",
         description="A python script that is being worked with",
     )
-    
+
     messages: List[ChatMessage] = pydantic.Field(
         [],
         title="messages",
         description="A list of messages",
     )
-     
+
     attachments: List[Any] = pydantic.Field(
         [],
         title="attachments",
@@ -135,13 +150,13 @@ class StreamCodeSynapse(bt.StreamingSynapse):
         title="Files",
         description="Files",
     )
-    
+
     uid: int = pydantic.Field(
         9999,
         title="UID",
         description="Miner uid to send task to",
     )
-    
+
     async def process_streaming_response(
         self, response: StreamingResponse
     ) -> AsyncIterator[str]:
@@ -163,7 +178,7 @@ class StreamCodeSynapse(bt.StreamingSynapse):
 
         async for chunk in response.content.iter_any():
             tokens = chunk.decode("utf-8")
-            
+
             try:
                 data = json.loads(tokens)
                 if isinstance(data, dict) or isinstance(data, list):
@@ -235,7 +250,7 @@ class StreamCodeSynapse(bt.StreamingSynapse):
             "header_size": int(headers.get("header_size", 0)),
             "dendrite": extract_info("bt_header_dendrite"),
             "axon": extract_info("bt_header_axon"),
-            "query": self.query, 
+            "query": self.query,
             "attachments": self.attachments,
             "completion": self.completion,
         }
