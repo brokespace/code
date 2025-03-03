@@ -117,7 +117,7 @@ class Validator(BaseValidatorNeuron):
         - Rewarding the miners
         - Updating the scores
         """
-        return self._forward(synapse)
+        return forward(self, synapse)
 
     # TODO make it so that the only thing accepted is the subnet owners hotkey + the validators coldkey
     async def blacklist(self, synapse: EvaluationSynapse) -> Tuple[bool, str]:
