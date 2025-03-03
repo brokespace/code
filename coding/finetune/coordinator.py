@@ -7,7 +7,7 @@ from pydantic import BaseModel
 from coding.protocol import EvaluationSynapse
 from coding.utils.uids import get_uid_from_hotkey
 from coding.constants import HONEST_VALIDATOR_HOTKEYS
-
+from coding.finetune.tracker import run_async_in_thread
 # Validator reaches out to other validator to see if it is scoring the same model
 # if so it will mark that the model is being evaluated by another server and wait
 # if not it will start evaluating the model
@@ -59,11 +59,13 @@ class FinetuneCoordinator:
             if uid is not None:
                 synapse = EvaluationSynapse()
                 try:
-                    response = self.dendrite.query(
-                        axons=self.metagraph.axons[uid],
-                        synapse=synapse,
-                        timeout=10,
-                        deserialize=False,
+                    response = run_async_in_thread(
+                        self.dendrite.aquery(
+                            axons=self.metagraph.axons[uid],
+                            synapse=synapse,
+                            timeout=10,
+                            deserialize=False,
+                        )
                     )
                     if response and response.alive:
                         self.servers.append(hotkey)
@@ -91,11 +93,13 @@ class FinetuneCoordinator:
                         synapse = EvaluationSynapse()
                         synapse.model_hash = model_hash
                         uid = get_uid_from_hotkey(self, server)
-                        response = self.dendrite.query(
-                            axons=self.metagraph.axons[uid],
-                            synapse=synapse,
-                            timeout=30,
-                            deserialize=False,
+                        response = run_async_in_thread(
+                            self.dendrite.aquery(
+                                axons=self.metagraph.axons[uid],
+                                synapse=synapse,
+                                timeout=30,
+                                deserialize=False,
+                            )
                         )
                         if response.alive and response.model_hash == model_hash and response.server_id == server and (response.in_progress or response.completed):
                             # Update our local status with the latest info
@@ -118,11 +122,13 @@ class FinetuneCoordinator:
                     synapse = EvaluationSynapse()
                     synapse.model_hash = model_hash
                     uid = get_uid_from_hotkey(self, server)
-                    response = self.dendrite.query(
-                        axons=self.metagraph.axons[uid],
-                        synapse=synapse,
-                        timeout=10,
-                        deserialize=False,
+                    response = run_async_in_thread(
+                        self.dendrite.aquery(
+                            axons=self.metagraph.axons[uid],
+                            synapse=synapse,
+                            timeout=10,
+                            deserialize=False,
+                        )
                     )
                     if response.alive and response.model_hash == model_hash and response.server_id == server and (response.in_progress or response.completed):
                         # Store the server that's evaluating it
