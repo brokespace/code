@@ -117,6 +117,7 @@ class Validator(BaseValidatorNeuron):
                 synapse.completed_at = status.completed_at
                 synapse.server_id = status.server_id
             synapse.alive = True
+            print("Synapse returned. ", synapse)
             return synapse
         return forward(self, synapse)
     
@@ -139,6 +140,7 @@ class Validator(BaseValidatorNeuron):
                 synapse.started_at = status.started_at
                 synapse.completed_at = status.completed_at
                 synapse.server_id = status.server_id
+            print("Synapse returned. ", synapse)
             synapse.alive = True
             return synapse
         return forward(self, synapse)

@@ -222,12 +222,11 @@ class FinetuneCoordinator:
                 
     def get_model_status(self, model_hash: str) -> ModelEvaluationStatus | None:
         """Get the evaluation status for a model"""
-        with self.lock:
-            status = self.evaluation_statuses.get(model_hash, None)
-            if status:
-                return status
-            else:
-                return None
+        status = self.evaluation_statuses.get(model_hash, None)
+        if status:
+            return status
+        else:
+            return None
     
     def get_all_statuses(self):
         """Get all evaluation statuses"""
