@@ -20,18 +20,6 @@ async def forward(self, synapse: EvaluationSynapse | None):
         self (:obj:`bittensor.neuron.Neuron`): The neuron object which contains all the necessary state for the validator.
     """
     bt.logging.info("🚀 Starting forward loop...")
-    if synapse is not None:
-        status = self.coordinator.get_model_status(synapse.model_hash)
-        if status:
-            synapse.in_progress = status.in_progress
-            synapse.completed = status.completed
-            synapse.score = status.score
-            synapse.started_at = status.started_at
-            synapse.completed_at = status.completed_at
-            synapse.server_id = status.server_id
-        synapse.alive = True
-        return synapse
-    
     if self.last_finetune_eval_time + 25 < self.block:
         if not FinetunePipeline.tasks_exist(self.config):
             FinetunePipeline.generate_tasks(self.config)

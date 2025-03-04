@@ -160,9 +160,9 @@ class FinetuneCoordinator:
         Returns:
             True if this server should evaluate the model, False otherwise
         """
+        status = self.get_status(model_hash)
         with self.lock:
             # Check if any server is already evaluating this model
-            status = self.get_status(model_hash)
             
             if status:
                 # If the model is being evaluated and not completed

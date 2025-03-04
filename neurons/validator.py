@@ -106,6 +106,18 @@ class Validator(BaseValidatorNeuron):
         """
         forward method that is called when the validator is queried with an axon
         """
+        if synapse is not None:
+            print("Synapse requested for model. ", synapse)
+            status = self.coordinator.get_model_status(synapse.model_hash)
+            if status:
+                synapse.in_progress = status.in_progress
+                synapse.completed = status.completed
+                synapse.score = status.score
+                synapse.started_at = status.started_at
+                synapse.completed_at = status.completed_at
+                synapse.server_id = status.server_id
+            synapse.alive = True
+            return synapse
         return forward(self, synapse)
     
     async def forward(self, synapse: EvaluationSynapse) -> Awaitable:
@@ -117,6 +129,18 @@ class Validator(BaseValidatorNeuron):
         - Rewarding the miners
         - Updating the scores
         """
+        if synapse is not None:
+            print("Synapse requested for model. ", synapse)
+            status = self.coordinator.get_model_status(synapse.model_hash)
+            if status:
+                synapse.in_progress = status.in_progress
+                synapse.completed = status.completed
+                synapse.score = status.score
+                synapse.started_at = status.started_at
+                synapse.completed_at = status.completed_at
+                synapse.server_id = status.server_id
+            synapse.alive = True
+            return synapse
         return forward(self, synapse)
 
     # TODO make it so that the only thing accepted is the subnet owners hotkey + the validators coldkey
