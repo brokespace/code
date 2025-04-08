@@ -48,6 +48,9 @@ You will have access to the following LLM models:
 
 - Along with that any model hosted from OpenRouter.
 
+- As well as any model hosted from Chutes.
+    - You can find the models [here](https://chutes.ai/app). Low-use models are not persisted and might be deleted, be cautious.
+
 You will also have access to the following embedding models:
 
 - "text-embedding-3-small"
