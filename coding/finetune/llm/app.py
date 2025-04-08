@@ -19,6 +19,7 @@ from google import genai
 from google.genai import types
 from langchain_openai import OpenAIEmbeddings
 
+from coding.helpers.chutes import Chutes
 
 token_usage: Dict[str, int] = {}
 current_key: Optional[str] = None
@@ -180,30 +181,35 @@ async def ainvoke_with_retry(
     initial_delay: int = 1,
     max_tokens: int = 16384,
 ):
+    chutes = Chutes(api_key=os.getenv("CHUTES_API_KEY"), model_timeout=180, create_chute=False)
     delay = initial_delay
     last_exception = None
     for attempt in range(max_retries):
-        try:
-            response = await call_openai(
-                query,
-                model,
-                temperature,
-                max_tokens,
-                api_key,
+        if chutes.model_exists(model):
+            response = chutes.invoke(model, query, temperature, max_tokens)
+            return {"content": response, "usage": {"total_tokens": 0}}
+        else:
+            try:
+                response = await call_openai(
+                    query,
+                    model,
+                    temperature,
+                    max_tokens,
+                    api_key,
             )
-            return response
-        except Exception as e:
-            print("Error in ainvoke_with_retry:", e, "when calling", model)
-            # Retry on rate-limit or server errors
-            if "429" in str(e) or "529" in str(e) or "list index out of range" in str(e):
-                last_exception = e
-                if attempt < max_retries - 1:
-                    await asyncio.sleep(delay)
-                    delay *= 2
+                return response
+            except Exception as e:
+                print("Error in ainvoke_with_retry:", e, "when calling", model)
+                # Retry on rate-limit or server errors
+                if "429" in str(e) or "529" in str(e) or "list index out of range" in str(e):
+                    last_exception = e
+                    if attempt < max_retries - 1:
+                        await asyncio.sleep(delay)
+                        delay *= 2
+                    else:
+                        raise
                 else:
                     raise
-            else:
-                raise
     if last_exception:
         raise last_exception
     else:
