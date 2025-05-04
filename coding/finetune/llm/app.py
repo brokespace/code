@@ -66,16 +66,23 @@ class InitRequest(BaseModel):
 
 
 class LLMRequest(BaseModel):
-    query: str
+    query: Optional[str] = None
+    messages: Optional[List[dict]] = None
+    tools: Optional[List[dict]] = None
     api_key: str
     llm_name: str
     temperature: Optional[float] = 0.7  # default temperature value
     max_tokens: Optional[int] = None
 
 
+class ToolCall(BaseModel):
+    name: str
+    args: dict
+
 class LLMResponse(BaseModel):
     result: str
     total_tokens: int
+    tool_calls: Optional[List[ToolCall]] = None
 
 
 class EmbeddingRequest(BaseModel):
@@ -144,9 +151,11 @@ async def get_count(auth_key: str = Depends(verify_auth)):
 
 
 async def call_openai(
-    query: str,
-    model: str,
-    temperature: float,
+    query: Optional[str] = None,
+    messages: Optional[List[dict]] = None,
+    tools: Optional[List[dict]] = None,
+    model: str = "gpt-4o",
+    temperature: float = 0.7,
     max_tokens: int = 16384,
     api_key: str = None,
 ):
@@ -158,7 +167,8 @@ async def call_openai(
     def sync_call():
         response = openai.chat.completions.create(
             model=model,
-            messages=[{"role": "user", "content": query}],
+            messages=messages if messages else [{"role": "user", "content": query}],
+            tools=tools,
             temperature=temperature,
             max_tokens=max_tokens,
             extra_body={"provider": {"sort": "throughput"}}
@@ -173,9 +183,11 @@ async def call_openai(
 
 async def ainvoke_with_retry(
     model: str,
-    query: str,
-    temperature: float,
-    api_key: str,
+    query: Optional[str] = None,
+    messages: Optional[List[dict]] = None,
+    tools: Optional[List[dict]] = None,
+    temperature: float = 0.7,
+    api_key: str = None,
     max_retries: int = 50,
     initial_delay: int = 1,
     max_tokens: int = 16384,
@@ -186,6 +198,8 @@ async def ainvoke_with_retry(
         try:
             response = await call_openai(
                 query,
+                messages,
+                tools,
                 model,
                 temperature,
                 max_tokens,
@@ -231,6 +245,8 @@ async def call_llm(request: LLMRequest):
         response = await ainvoke_with_retry(
             requested_llm,
             request.query,
+            request.messages,
+            request.tools,
             request.temperature,
             request.api_key,
             max_tokens=max_tokens,
