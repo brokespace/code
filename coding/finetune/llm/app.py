@@ -1,7 +1,7 @@
 from dotenv import load_dotenv
 
 load_dotenv("../../../.env", override=False)  # Don't override existing env vars
-
+CHUTES_ONLY = True
 import os
 
 os.environ["OPENAI_BASE_URL"] = "https://openrouter.ai/api/v1"
@@ -188,7 +188,7 @@ async def ainvoke_with_retry(
         if chutes.model_exists(model):
             response = chutes.invoke(model, query, temperature, max_tokens)
             return {"content": response, "usage": {"total_tokens": 0}}
-        else:
+        elif not CHUTES_ONLY:
             try:
                 response = await call_openai(
                     query,
