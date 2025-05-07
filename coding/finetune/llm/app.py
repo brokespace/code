@@ -3,12 +3,13 @@ from dotenv import load_dotenv
 load_dotenv("../../../.env", override=False)  # Don't override existing env vars
 
 import os
-
+import traceback
 os.environ["OPENAI_BASE_URL"] = "https://openrouter.ai/api/v1"
 import asyncio
 from fastapi import FastAPI, HTTPException, Depends
 from pydantic import BaseModel
 from typing import Optional, Dict, List
+import json
 
 # ------------------------------
 #    Import Provider Libraries
@@ -76,6 +77,7 @@ class LLMRequest(BaseModel):
 
 
 class ToolCall(BaseModel):
+    id: str
     name: str
     args: dict
 
@@ -159,27 +161,101 @@ async def call_openai(
     max_tokens: int = 16384,
     api_key: str = None,
 ):
+    print("Calling OpenAI", flush=True)
+    # print out all the arguments in a way that i can copy and paste into python as a dictionary
+    print({"query": query, "messages": messages, "tools": tools, "model": model, "temperature": temperature, "max_tokens": max_tokens, "api_key": api_key})
+    
     if not api_key:
         print("No API key provided")
-        return {"content": "", "usage": {"total_tokens": 0}}
+        return {"content": "", "usage": {"total_tokens": 0}, "tool_calls": None}
     openai.api_key = api_key
 
     def sync_call():
-        response = openai.chat.completions.create(
-            model=model,
-            messages=messages if messages else [{"role": "user", "content": query}],
-            tools=tools,
-            temperature=temperature,
-            max_tokens=max_tokens,
-            extra_body={"provider": {"sort": "throughput"}}
-        )
+        # Prepare arguments, conditionally adding tools if they exist
+        kwargs = {
+            "model": model,
+            "messages": messages if messages else [{"role": "user", "content": query}],
+            "temperature": temperature,
+            "max_tokens": max_tokens,
+            # "extra_body": {"provider": {"sort": "throughput"}},
+            "extra_body": {"provider": {"order": ["Anthropic"]}},
+            "stream": True
+        }
+        # Only add tools if the list is non-empty to avoid Bedrock validation error
+        if tools and len(tools) > 0:
+            kwargs["tools"] = tools
+        
+        full_content = ""
+        final_tool_calls = {}
+        total_tokens = 0
+        response_id = None
+        
+        # Stream the response chunks
+        for chunk in openai.chat.completions.create(**kwargs):
+            print(chunk, flush=True)
+            if not response_id:
+                response_id = chunk.id
+            if chunk.choices[0].delta.content:
+                content = chunk.choices[0].delta.content
+                full_content += content
+            
+            # Handle tool calls
+            delta = chunk.choices[0].delta
+            if hasattr(delta, 'tool_calls') and delta.tool_calls:
+                for tool_call in delta.tool_calls:
+                    index = tool_call.index
+                    if tool_call.type == 'function':
+                        if index not in final_tool_calls:
+                            final_tool_calls[index] = {
+                                "id": tool_call.id,
+                                "type": "function",
+                                "function": {
+                                    "name": tool_call.function.name,
+                                    "arguments": tool_call.function.arguments or ""
+                                }
+                            }
+                        elif tool_call.function.arguments:
+                            final_tool_calls[index]["function"]["arguments"] += tool_call.function.arguments
+                            
+            if chunk.usage:
+                total_tokens = chunk.usage.total_tokens
+
+        # Convert tool calls to list format
+        tool_calls_list = list(final_tool_calls.values()) if final_tool_calls else None
+
+        # Create a complete response object
+        response = {
+            "id": response_id,
+            "choices": [{
+                "message": {
+                    "content": full_content,
+                    "role": "assistant",
+                    "tool_calls": tool_calls_list
+                },
+                "index": 0
+            }],
+            "usage": {
+                "total_tokens": total_tokens,
+                "prompt_tokens": 0,
+                "completion_tokens": total_tokens
+            }
+        }
         return response
-
     response = await asyncio.to_thread(sync_call)
-    result = response.choices[0].message.content
-    tokens = response.usage.prompt_tokens + response.usage.completion_tokens
-    return {"content": result, "usage": {"total_tokens": tokens}}
+    print(response, flush=True)
+    # Handle case where response or choices might be None
+    if not response or not response.get("choices"):
+        return {"content": "", "usage": {"total_tokens": 0}, "tool_calls": None}
+        
+    message = response["choices"][0]["message"]
+    result = message.get("content") if message else None
+    tool_calls = message.get("tool_calls") if message else None
 
+    tokens = 0
+    if response.get("usage"):
+        tokens = response["usage"]["total_tokens"]
+        
+    return {"content": result, "usage": {"total_tokens": tokens}, "tool_calls": tool_calls}
 
 async def ainvoke_with_retry(
     model: str,
@@ -188,7 +264,7 @@ async def ainvoke_with_retry(
     tools: Optional[List[dict]] = None,
     temperature: float = 0.7,
     api_key: str = None,
-    max_retries: int = 50,
+    max_retries: int = 5,
     initial_delay: int = 1,
     max_tokens: int = 16384,
 ):
@@ -208,16 +284,23 @@ async def ainvoke_with_retry(
             return response
         except Exception as e:
             print("Error in ainvoke_with_retry:", e, "when calling", model)
+            traceback.print_exc()
             # Retry on rate-limit or server errors
-            if "429" in str(e) or "529" in str(e) or "list index out of range" in str(e):
+            # Added check for potential None response or missing keys which might cause errors
+            if isinstance(e, (openai.RateLimitError, openai.APIStatusError)) or \
+               (isinstance(e, IndexError) and "list index out of range" in str(e)) or \
+               "529" in str(e): # Check common retryable error types/codes
                 last_exception = e
                 if attempt < max_retries - 1:
+                    print(f"Retrying in {delay} seconds...")
                     await asyncio.sleep(delay)
                     delay *= 2
                 else:
-                    raise
+                    print("Max retries reached.")
+                    raise # Re-raise the last exception after max retries
             else:
-                raise
+                print("Non-retryable error encountered.")
+                raise # Re-raise immediately for non-retryable errors
     if last_exception:
         raise last_exception
     else:
@@ -236,11 +319,26 @@ async def call_llm(request: LLMRequest):
 
         # Attempt the requested LLM; fall back to "gpt-4o" if not found.
         requested_llm = request.llm_name
+        max_tokens = models.get("gpt-4o", {}).get("max_tokens", 16384) # Default max_tokens
         if request.llm_name in models:
-            requested_llm = f"{models[request.llm_name]['provider']}/{models[request.llm_name]['model']}"
-            max_tokens = models[request.llm_name]["max_tokens"]
+            model_config = models[request.llm_name]
+            # Assuming provider info is part of the model name passed to call_openai now
+            # Let's keep requested_llm as the key for models dict for simplicity here.
+            # The actual API model name is fetched within call_openai or ainvoke_with_retry based on the key
+            # For openrouter, the format is usually "provider/model"
+            requested_llm = f"{model_config['provider']}/{model_config['model']}" # Construct full model name if needed by API
+            max_tokens = model_config["max_tokens"]
+        else:
+            # Handle case where llm_name is not in models dict - maybe it's a direct model string?
+            # We might need a default provider or assume it's openai compatible
+            print(f"Warning: llm_name '{request.llm_name}' not found in configured models. Attempting direct call.")
+            # If provider isn't specified, how does call_openai know? Let's assume it's openai format or similar
+            # Or maybe the name already includes the provider like "openai/gpt-4o"
+            requested_llm = request.llm_name # Use the name directly
+
+
         if request.max_tokens:
-            max_tokens = request.max_tokens
+            max_tokens = request.max_tokens # Override if provided in request
 
         response = await ainvoke_with_retry(
             requested_llm,
@@ -253,14 +351,28 @@ async def call_llm(request: LLMRequest):
         )
 
         # Update token usage (if provided by the API)
-        tokens = response["usage"].get("total_tokens", 0)
+        tokens = response.get("usage", {}).get("total_tokens", 0)
         token_usage[current_key] += tokens
 
+        # Process tool calls if present
+        tool_calls_response = None
+        if response.get("tool_calls"):
+            tool_calls_response = [
+                ToolCall(id=tc["id"], name=tc["function"]["name"], args=json.loads(tc["function"]["arguments"]))
+                for tc in response["tool_calls"]
+            ]
+
+        # Ensure result is a string, provide default if content is None
+        result_content = response.get("content", "") or ""
+
         return LLMResponse(
-            result=response["content"], total_tokens=token_usage[current_key]
+            result=result_content, # Use the processed result_content
+            total_tokens=token_usage[current_key],
+            tool_calls=tool_calls_response # Pass the processed tool calls
         )
     except Exception as e:
         print("Error in call_llm endpoint:", e)
+        traceback.print_exc() # Print full traceback for debugging
         raise HTTPException(status_code=500, detail=str(e))
 
 
