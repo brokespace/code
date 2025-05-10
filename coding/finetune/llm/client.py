@@ -1,6 +1,24 @@
 import os
 import requests
 
+from pydantic import BaseModel
+from enum import Enum
+
+class Role(Enum):
+    SYSTEM = "system"
+    USER = "user"
+    ASSISTANT = "assistant"
+    TOOL = "tool"
+
+class BaseMessage(BaseModel):
+    role: Role
+    content: str
+
+class ToolCallMessage(BaseMessage):
+    role: Role = Role.TOOL
+    tool_call_id: str
+    name: str
+    content: str
 
 class LLMClient:
     def __init__(
@@ -31,6 +49,8 @@ class LLMClient:
         result = response.json()
         return result["result"], result["total_tokens"]
 
+    def 
+    
     def embed(self, query: str) -> list[float]:
         """
         Get embeddings for text using the embedding API endpoint

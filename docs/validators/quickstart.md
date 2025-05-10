@@ -94,6 +94,19 @@ Once you have an account, create an API key and place it in the .env file like t
 CORCEL_API_KEY=<your corcel api key>
 ```
 
+#### Get a Chutes API Key
+
+As a validator you will need to use the Chutes API to validate the miner submissions.
+
+Instructions for getting an API Key can be found [here](https://github.com/rayonlabs/chutes?tab=readme-ov-file#-validators-and-subnet-owners).
+
+Place the api key in the .env file like this:
+
+```
+CHUTES_API_KEY=<your chutes api key>
+```
+
+
 #### Get a Claude API Key
 
 Place the api key in the .env file like this:

@@ -1,7 +1,7 @@
 from dotenv import load_dotenv
 
 load_dotenv("../../../.env", override=False)  # Don't override existing env vars
-
+CHUTES_ONLY = False
 import os
 import traceback
 os.environ["OPENAI_BASE_URL"] = "https://openrouter.ai/api/v1"
@@ -20,6 +20,7 @@ from google import genai
 from google.genai import types
 from langchain_openai import OpenAIEmbeddings
 
+from coding.helpers.chutes import Chutes
 
 token_usage: Dict[str, int] = {}
 current_key: Optional[str] = None
@@ -162,47 +163,47 @@ async def call_openai(
     api_key: str = None,
 ):
     print("Calling OpenAI", flush=True)
-    # print out all the arguments in a way that i can copy and paste into python as a dictionary
     print({"query": query, "messages": messages, "tools": tools, "model": model, "temperature": temperature, "max_tokens": max_tokens, "api_key": api_key})
     
     if not api_key:
         print("No API key provided")
         return {"content": "", "usage": {"total_tokens": 0}, "tool_calls": None}
-    openai.api_key = api_key
-
-    def sync_call():
-        # Prepare arguments, conditionally adding tools if they exist
-        kwargs = {
-            "model": model,
-            "messages": messages if messages else [{"role": "user", "content": query}],
-            "temperature": temperature,
-            "max_tokens": max_tokens,
-            # "extra_body": {"provider": {"sort": "throughput"}},
-            "extra_body": {"provider": {"order": ["Anthropic"]}},
-            "stream": True
-        }
-        # Only add tools if the list is non-empty to avoid Bedrock validation error
-        if tools and len(tools) > 0:
-            kwargs["tools"] = tools
+    
+    # Prepare arguments, conditionally adding tools if they exist
+    kwargs = {
+        "model": model,
+        "messages": messages if messages else [{"role": "user", "content": query}],
+        "temperature": temperature,
+        "max_tokens": max_tokens,
+        "extra_body": {"provider": {"order": ["Anthropic"]}},
+    }
+    
+    # Only add tools if the list is non-empty to avoid validation errors
+    if tools and len(tools) > 0:
+        kwargs["tools"] = tools
+    
+    try:
+        # Create an async client for OpenAI
+        async_client = openai.AsyncOpenAI(api_key=api_key)
         
+        # Use the streaming API to get the response
         full_content = ""
         final_tool_calls = {}
         total_tokens = 0
         response_id = None
         
-        # Stream the response chunks
-        for chunk in openai.chat.completions.create(**kwargs):
-            print(chunk, flush=True)
-            if not response_id:
+        async for chunk in await async_client.chat.completions.create(stream=True, **kwargs):
+            # print(chunk, flush=True)
+            if not response_id and hasattr(chunk, 'id'):
                 response_id = chunk.id
-            if chunk.choices[0].delta.content:
+                
+            if chunk.choices and chunk.choices[0].delta.content:
                 content = chunk.choices[0].delta.content
                 full_content += content
             
             # Handle tool calls
-            delta = chunk.choices[0].delta
-            if hasattr(delta, 'tool_calls') and delta.tool_calls:
-                for tool_call in delta.tool_calls:
+            if chunk.choices and hasattr(chunk.choices[0].delta, 'tool_calls') and chunk.choices[0].delta.tool_calls:
+                for tool_call in chunk.choices[0].delta.tool_calls:
                     index = tool_call.index
                     if tool_call.type == 'function':
                         if index not in final_tool_calls:
@@ -217,45 +218,22 @@ async def call_openai(
                         elif tool_call.function.arguments:
                             final_tool_calls[index]["function"]["arguments"] += tool_call.function.arguments
                             
-            if chunk.usage:
-                total_tokens = chunk.usage.total_tokens
-
+            # if hasattr(chunk, 'usage'):
+                # total_tokens = chunk.usage.total_tokens
+        
         # Convert tool calls to list format
         tool_calls_list = list(final_tool_calls.values()) if final_tool_calls else None
-
-        # Create a complete response object
-        response = {
-            "id": response_id,
-            "choices": [{
-                "message": {
-                    "content": full_content,
-                    "role": "assistant",
-                    "tool_calls": tool_calls_list
-                },
-                "index": 0
-            }],
-            "usage": {
-                "total_tokens": total_tokens,
-                "prompt_tokens": 0,
-                "completion_tokens": total_tokens
-            }
+        
+        return {
+            "content": full_content, 
+            "usage": {"total_tokens": total_tokens}, 
+            "tool_calls": tool_calls_list
         }
-        return response
-    response = await asyncio.to_thread(sync_call)
-    print(response, flush=True)
-    # Handle case where response or choices might be None
-    if not response or not response.get("choices"):
-        return {"content": "", "usage": {"total_tokens": 0}, "tool_calls": None}
         
-    message = response["choices"][0]["message"]
-    result = message.get("content") if message else None
-    tool_calls = message.get("tool_calls") if message else None
-
-    tokens = 0
-    if response.get("usage"):
-        tokens = response["usage"]["total_tokens"]
-        
-    return {"content": result, "usage": {"total_tokens": tokens}, "tool_calls": tool_calls}
+    except Exception as e:
+        print(f"Error calling OpenAI API: {e}")
+        traceback.print_exc()
+        return {"content": f"API Error: {str(e)}", "usage": {"total_tokens": 0}, "tool_calls": None}
 
 async def ainvoke_with_retry(
     model: str,
@@ -268,28 +246,55 @@ async def ainvoke_with_retry(
     initial_delay: int = 1,
     max_tokens: int = 16384,
 ):
+    chutes = Chutes(api_key=os.getenv("CHUTES_API_KEY"), model_timeout=180, create_chute=False)
     delay = initial_delay
     last_exception = None
     for attempt in range(max_retries):
+        if query and not messages:
+            messages = [{"role": "user", "content": query}]
+            
         try:
-            response = await call_openai(
-                query,
-                messages,
-                tools,
-                model,
-                temperature,
-                max_tokens,
-                api_key,
-            )
-            return response
+            # Check if model exists in Chutes
+            model_exists = await chutes.model_exists_async(model)
+            if model_exists:
+                print("Using Chutes for ", model, flush=True)
+                response = await chutes.invoke_async(model, messages, temperature, tools, max_tokens, timeout=60)
+                return {"content": response, "usage": {"total_tokens": 0}}
+            elif not CHUTES_ONLY:
+                response = await call_openai(
+                    query,
+                    messages,
+                    tools,
+                    model,
+                    temperature,
+                    max_tokens,
+                    api_key,
+                )
+                return response
+            else:
+                raise Exception(f"Model {model} not found in Chutes and CHUTES_ONLY is set")
+                
+        except TimeoutError as e:
+            print(f"Timeout error: {e}")
+            last_exception = e
+            if attempt < max_retries - 1:
+                print(f"Retrying in {delay} seconds...")
+                await asyncio.sleep(delay)
+                delay *= 2
+            else:
+                print("Max retries reached.")
+                raise HTTPException(
+                    status_code=408, 
+                    detail=f"Timeout when calling {model} after {max_retries} attempts"
+                )
         except Exception as e:
             print("Error in ainvoke_with_retry:", e, "when calling", model)
             traceback.print_exc()
             # Retry on rate-limit or server errors
             # Added check for potential None response or missing keys which might cause errors
             if isinstance(e, (openai.RateLimitError, openai.APIStatusError)) or \
-               (isinstance(e, IndexError) and "list index out of range" in str(e)) or \
-               "529" in str(e): # Check common retryable error types/codes
+            (isinstance(e, IndexError) and "list index out of range" in str(e)) or \
+            "529" in str(e): # Check common retryable error types/codes
                 last_exception = e
                 if attempt < max_retries - 1:
                     print(f"Retrying in {delay} seconds...")
@@ -301,6 +306,7 @@ async def ainvoke_with_retry(
             else:
                 print("Non-retryable error encountered.")
                 raise # Re-raise immediately for non-retryable errors
+                
     if last_exception:
         raise last_exception
     else:

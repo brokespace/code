@@ -102,7 +102,8 @@ class LLMClient:
             "tools": tools,
             "temperature": temperature,
             "max_tokens": max_tokens,
-            "model": model,
+            "llm_name": model,
+            "api_key": self.api_key,
         }
 
         response = requests.post(f"{self.base_url}/call", json=payload)
