@@ -10,6 +10,7 @@ from fastapi import FastAPI, HTTPException, Depends
 from pydantic import BaseModel
 from typing import Optional, Dict, List
 import json
+import aiohttp
 
 # ------------------------------
 #    Import Provider Libraries
@@ -22,7 +23,7 @@ from langchain_openai import OpenAIEmbeddings
 
 from coding.helpers.chutes import Chutes
 
-token_usage: Dict[str, int] = {}
+key_cost: Dict[str, int] = {}
 current_key: Optional[str] = None
 
 # FastAPI App
@@ -85,6 +86,7 @@ class ToolCall(BaseModel):
 class LLMResponse(BaseModel):
     result: str
     total_tokens: int
+    cost: float
     tool_calls: Optional[List[ToolCall]] = None
 
 
@@ -108,6 +110,11 @@ class BatchEmbeddingResponse(BaseModel):
 class BatchEmbeddingResponse(BaseModel):
     vectors: List[List[float]]
 
+class CostRequest(BaseModel):
+    api_key: str
+
+class ResetRequest(BaseModel):
+    api_key: str
 
 # ------------------------------
 #       Auth Dependency
@@ -125,33 +132,39 @@ async def verify_auth(auth_key: str = Depends(lambda: os.getenv("LLM_AUTH_KEY"))
 # ------------------------------
 @app.post("/init")
 async def init_key(request: InitRequest, auth_key: str = Depends(verify_auth)):
-    global current_key
-    if request.key not in token_usage:
-        token_usage[request.key] = 0
-    current_key = request.key
-    return {"message": f"Set active key to {request.key}"}
+    if request.key not in key_cost:
+        key_cost[request.key] = 0
+    return {"message": f"Initialized key {request.key}"}
 
 
 @app.post("/reset")
-async def reset_count(auth_key: str = Depends(verify_auth)):
-    global current_key
-    if not current_key:
-        raise HTTPException(
-            status_code=400, detail="No active key. Call /init endpoint first."
-        )
-    token_usage[current_key] = 0
-    return {"message": f"Reset token count for key {current_key}"}
+async def reset_cost(request: ResetRequest, auth_key: str = Depends(verify_auth)):
+    key_cost[request.api_key] = 0
+    return {"message": f"Reset token count for key {request.api_key}"}
 
+@app.get("/cost")
+async def get_cost(request: CostRequest):
+    return {"key": request.api_key, "cost": key_cost[request.api_key]}
 
-@app.get("/count")
-async def get_count(auth_key: str = Depends(verify_auth)):
-    global current_key
-    if not current_key:
-        raise HTTPException(
-            status_code=400, detail="No active key. Call /init endpoint first."
-        )
-    return {"key": current_key, "count": token_usage[current_key]}
-
+async def get_generation_stats(response_id: str, api_key: str):
+    headers = {"Authorization": f"Bearer {api_key}"}
+    retries = 0
+    max_retries = 3
+    
+    while retries < max_retries:
+        async with aiohttp.ClientSession() as session:
+            async with session.get(
+                f'https://openrouter.ai/api/v1/generation?id={response_id}',
+                headers=headers
+            ) as response:
+                if response.status == 404:
+                    retries += 1
+                    if retries >= max_retries:
+                        return None
+                    await asyncio.sleep(0.5)
+                    continue
+                return (await response.json())['data']
+    return None
 
 async def call_openai(
     query: Optional[str] = None,
@@ -227,7 +240,8 @@ async def call_openai(
         return {
             "content": full_content, 
             "usage": {"total_tokens": total_tokens}, 
-            "tool_calls": tool_calls_list
+            "tool_calls": tool_calls_list,
+            "response_id": response_id
         }
         
     except Exception as e:
@@ -261,6 +275,8 @@ async def ainvoke_with_retry(
                 response = await chutes.invoke_async(model, messages, temperature, tools, max_tokens, timeout=60)
                 return {"content": response, "usage": {"total_tokens": 0}}
             elif not CHUTES_ONLY:
+                if api_key not in key_cost:
+                    raise HTTPException(status_code=400, detail="The provided API key has not been initialized. Please call /init first.")
                 response = await call_openai(
                     query,
                     messages,
@@ -316,12 +332,7 @@ async def ainvoke_with_retry(
 @app.post("/call", response_model=LLMResponse)
 async def call_llm(request: LLMRequest):
     print("Calling LLM", flush=True)
-    global current_key, token_usage
     try:
-        if not current_key:
-            # If no key is initialized, default to "test"
-            current_key = "test"
-            token_usage[current_key] = 0
 
         # Attempt the requested LLM; fall back to "gpt-4o" if not found.
         requested_llm = request.llm_name
@@ -355,10 +366,12 @@ async def call_llm(request: LLMRequest):
             request.api_key,
             max_tokens=max_tokens,
         )
-
-        # Update token usage (if provided by the API)
-        tokens = response.get("usage", {}).get("total_tokens", 0)
-        token_usage[current_key] += tokens
+        if response.get("response_id"):
+            response_id = response["response_id"]
+            stats = await get_generation_stats(response_id, request.api_key)
+            if stats:
+                total_cost = stats['total_cost']
+                key_cost[request.api_key] += total_cost
 
         # Process tool calls if present
         tool_calls_response = None
@@ -373,7 +386,8 @@ async def call_llm(request: LLMRequest):
 
         return LLMResponse(
             result=result_content, # Use the processed result_content
-            total_tokens=token_usage[current_key],
+            total_tokens=0,
+            cost=key_cost[request.api_key] if request.api_key in key_cost else 0,
             tool_calls=tool_calls_response # Pass the processed tool calls
         )
     except Exception as e:

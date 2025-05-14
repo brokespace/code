@@ -60,20 +60,24 @@ class LLMManager:
         self.current_key = key
         return result
 
-    def reset_count(self) -> Dict[str, str]:
+    def reset_cost(self) -> Dict[str, str]:
         """
         Reset token count for current key
 
         Returns:
             Dict containing reset status
         """
-        return self._make_request("post", "reset")
+        if not self.current_key:
+            raise ValueError("No key has been initialized")
+        return self._make_request("post", "reset", json={"api_key": self.current_key})
 
-    def get_count(self) -> Dict[str, Any]:
+    def get_cost(self) -> Dict[str, Any]:
         """
-        Get current token count
+        Get current token count and cost
 
         Returns:
-            Dict containing current key and count
+            Dict containing current key and cost
         """
-        return self._make_request("get", "count")
+        if not self.current_key:
+            raise ValueError("No key has been initialized")
+        return self._make_request("get", "cost", json={"api_key": self.current_key})
