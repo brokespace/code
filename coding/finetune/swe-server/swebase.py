@@ -15,6 +15,9 @@ class Role(Enum):
 class BaseMessage(BaseModel):
     role: Role
     content: str
+    
+    class Config:
+        use_enum_values = True
 
 
 class ToolCallMessage(BaseMessage):
