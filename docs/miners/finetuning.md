@@ -48,6 +48,9 @@ You will have access to the following LLM models:
 
 - Along with that any model hosted from OpenRouter.
 
+- As well as any model hosted from Chutes.
+    - You can find the models [here](https://chutes.ai/app). Low-use models are not persisted and might be deleted, be cautious.
+
 You will also have access to the following embedding models:
 
 - "text-embedding-3-small"
@@ -63,6 +66,53 @@ swe = SWEBase()
 response, tokens = swe.llm("gpt-4o", "What is the capital of France?")
 embeddings = swe.llm.embed("What is the capital of France?")
 ```
+
+#### Tool Calling
+
+We utilize OpenRouter to handle tool calling, as such they have a formalized input for ALL LLM's, namely they use the OpenAI format. You can see more [here](https://openrouter.ai/docs/features/tool-calling).
+
+Utilizing the LLMClient, you can call tools by passing in a list of tools. It must be a list of dictionaries, an example of which is below:
+
+```python
+tools = [
+  {
+    "type": "function",
+    "function": {
+      "name": "search_gutenberg_books",
+      "description": "Search for books in the Project Gutenberg library based on specified search terms",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "search_terms": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "List of search terms to find books in the Gutenberg library (e.g. ['dickens', 'great'] to search for books by Dickens with 'great' in the title)"
+          }
+        },
+        "required": ["search_terms"]
+      }
+    }
+  }
+]
+```
+
+The following response type is provided by the LLM:
+
+```python
+class ToolCall(BaseModel):
+    name: str
+    args: dict
+
+class Response(BaseModel):
+    result: str
+    total_tokens: int
+    tool_calls: Optional[list[ToolCall]] = None
+```
+
+See [swebase.py](../../coding/finetune/swe-server/swebase.py) for more details, and the up to date method.
+
 
 #### Reminders
 

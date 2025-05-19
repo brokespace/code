@@ -51,6 +51,30 @@ class FinetuneEventResults(BaseModel):
             "competition_id": COMPETITION_ID,
         }
 
+def adjust_score_by_cost(score: float, llm_cost: float) -> float:
+    """
+    Adjust the score based on the LLM cost.
+    
+    Args:
+        score: The original score
+        llm_cost: The total cost of LLM usage
+        
+    Returns:
+        The adjusted score after accounting for LLM cost
+    """
+    ideal_cost = 0.5
+    
+    # If cost is below or equal to ideal, return the original score
+    if llm_cost <= ideal_cost:
+        return score
+    
+    # Calculate penalty factor - higher costs result in higher penalties
+    penalty_factor = 1.0 - min(0.9, (llm_cost - ideal_cost) / ideal_cost)
+    
+    # Apply penalty to score
+    adjusted_score = score * penalty_factor
+    
+    return adjusted_score
 
 def should_evaluate(tracker: TrackingInfo, block: int) -> bool:
     """
@@ -368,7 +392,7 @@ class FinetunePipeline:
 
             # Otherwise, evaluate the logic
             print(f"Initializing LLM key for hotkey {tracker.hotkey}...")
-            self.llm_manager.init_key(tracker.hotkey)
+            self.llm_manager.init_key(api_key.key)
             print(f"Starting docker container for hotkey {tracker.hotkey}...")
             scores = []
             # Create a thread pool to process tasks in parallel
@@ -410,7 +434,6 @@ class FinetunePipeline:
                         # TODO in the next comp uncomment the below
                         # score = task.score(patch, self.llm_manager.get_count())
                         score = task.score(patch)
-                        # self.llm_manager.reset_count()
                         print(
                             f"Score for hotkey {tracker.hotkey}, task index {task_idx}: {score}"
                         )
@@ -461,15 +484,16 @@ class FinetunePipeline:
                     print(
                         f"Completed task {task_idx}/{len(self.tasks)} for hotkey {tracker.hotkey}"
                     )
-            tracker.score = sum(scores) / len(scores)
+            cost = self.llm_manager.get_cost()
+            tracker.score = adjust_score_by_cost(sum(scores) / len(scores), cost["cost"] / len(scores))
             tracker.score_timestamps.append(self.metagraph.block)
+            
             self.graded_trackers.append(tracker)
             self.model_store.set_hotkey_scoring_status(tracker.hotkey, False, False)
             model.score = tracker.score
             if store_results:
                 self.store_trackers()
                 self.model_store.save()
-            
             api_key.delete()
 
             print(f"Cleaning up container for hotkey {tracker.hotkey}...")
