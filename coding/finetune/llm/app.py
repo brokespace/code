@@ -140,7 +140,13 @@ async def init_key(request: InitRequest, auth_key: str = Depends(verify_auth)):
 @app.post("/reset")
 async def reset_cost(request: ResetRequest, auth_key: str = Depends(verify_auth)):
     key_cost[request.api_key] = 0
+    del key_cost[request.api_key]
     return {"message": f"Reset token count for key {request.api_key}"}
+
+@app.post("/clear")
+async def clear_cost(auth_key: str = Depends(verify_auth)):
+    key_cost.clear()
+    return {"message": "Cleared token count for all keys"}
 
 @app.get("/cost")
 async def get_cost(request: CostRequest):

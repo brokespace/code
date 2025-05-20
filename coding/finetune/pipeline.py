@@ -485,6 +485,7 @@ class FinetunePipeline:
                         f"Completed task {task_idx}/{len(self.tasks)} for hotkey {tracker.hotkey}"
                     )
             cost = self.llm_manager.get_cost()
+            self.llm_manager.clear_cost()
             tracker.score = adjust_score_by_cost(sum(scores) / len(scores), cost["cost"] / len(scores))
             tracker.score_timestamps.append(self.metagraph.block)
             

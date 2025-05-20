@@ -81,3 +81,12 @@ class LLMManager:
         if not self.current_key:
             raise ValueError("No key has been initialized")
         return self._make_request("get", "cost", json={"api_key": self.current_key})
+
+    def clear_cost(self) -> Dict[str, str]:
+        """
+        Clear token count for all keys
+
+        Returns:
+            Dict containing clear status
+        """
+        return self._make_request("post", "clear")
