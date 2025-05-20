@@ -44,6 +44,7 @@ from coding.base.validator import BaseValidatorNeuron
 from coding.finetune.dockerutil import test_docker_container
 from coding.helpers.containers import DockerServer, test_docker_server
 from coding.utils.logging import init_wandb_if_not_exists
+from coding.finetune.llm.manager import LLMManager
 
 class Validator(BaseValidatorNeuron):
     """
@@ -76,6 +77,8 @@ class Validator(BaseValidatorNeuron):
         #     if p > 0
         # ]
         self.executor = ThreadPoolExecutor()
+        self.llm_manager = LLMManager()
+        self.llm_manager.init_key(os.getenv("OPENROUTER_API_KEY"))
         # Load the reward pipeline
         # self.reward_pipeline = RewardPipeline(
             # selected_tasks=self.active_tasks,
