@@ -281,7 +281,7 @@ async def ainvoke_with_retry(
                 response = await chutes.invoke_async(model, messages, temperature, tools, max_tokens, timeout=60)
                 return {"content": response, "usage": {"total_tokens": 0}}
             elif not CHUTES_ONLY:
-                if api_key not in key_cost:
+                if api_key not in key_cost and os.getenv("TESTING", "false") != "true":
                     raise HTTPException(status_code=400, detail="The provided API key has not been initialized. Please call /init first.")
                 response = await call_openai(
                     query,
@@ -375,7 +375,7 @@ async def call_llm(request: LLMRequest):
         if response.get("response_id"):
             response_id = response["response_id"]
             stats = await get_generation_stats(response_id, request.api_key)
-            if stats:
+            if stats and os.getenv("TESTING", "false") != "true":
                 total_cost = stats['total_cost']
                 key_cost[request.api_key] += total_cost
 
@@ -393,7 +393,7 @@ async def call_llm(request: LLMRequest):
         return LLMResponse(
             result=result_content, # Use the processed result_content
             total_tokens=0,
-            cost=key_cost[request.api_key] if request.api_key in key_cost else 0,
+            cost=key_cost[request.api_key] if request.api_key in key_cost and os.getenv("TESTING", "false") != "true" else 0,
             tool_calls=tool_calls_response # Pass the processed tool calls
         )
     except Exception as e:

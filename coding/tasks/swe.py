@@ -300,8 +300,46 @@ def grab_file_from_repo(repo_path: str, file_path: str) -> str:
     with open(os.path.join(repo_path, file_path), "r") as f:
         return f.read()
 
+def git_diff_to_changed_files(diff: str, repo_path: str) -> ChangedFiles:
+    # This function was generated using Cursor and not verified. It is only used to get the changed files to later be used to find the file names, the old and new content may be incorrect.
+    changed_files = []
+    file_name = None
+    
+    lines = diff.split("\n")
+    i = 0
+    while i < len(lines):
+        line = lines[i]
+        # Start of a new file diff
+        if line.startswith("diff --git"):
+            # Save the previous file if there was one
+            if file_name:
+                changed_files.append(
+                    ChangedFile(
+                        file_name=file_name,
+                        old_content="",
+                        new_content=""
+                    )
+                )
+            
+            # Reset for new file
+            parts = line.split()
+            if len(parts) >= 4:
+                file_name = parts[3][2:]  # Extract from b/path/to/file
+        i += 1
+    
+    # Add the last file if there is one
+    if file_name:
+        changed_files.append(
+            ChangedFile(
+                file_name=file_name,
+                old_content="",
+                new_content=""
+            )
+        )
+    
+    return ChangedFiles(files=[file.model_dump() for file in changed_files])
 
-def patch_to_changed_files(patch: Patch, repo_path: str) -> ChangedFiles:
+def patch_to_changed_files(patch: Patch | str, repo_path: str) -> ChangedFiles:
     changed_files = []
     file_edits = {}
     for edit in patch.edits:
@@ -462,13 +500,17 @@ WORKDIR /testbed/
     #     except Exception as e:
     #         bt.logging.warning(f"Failed to remove Docker image: {e}")
 
-    def score(self, patch: Patch):
+    def score(self, patch: Patch | str):
         try:
-            changed_files = patch_to_changed_files(patch, self.repo.path)
+            changed_files = patch_to_changed_files(patch, self.repo.path) if isinstance(patch, Patch) else git_diff_to_changed_files(patch, self.repo.path)
+            if any("test" in file.file_name for file in changed_files.files):
+                # This is not a valid patch, return 0
+                print("Miner is not allowed to touch test files, returning a score of 0")
+                return 0
             changed_files.files = [
                 file for file in changed_files.files if "test" not in file.file_name
             ]
-            diff = create_diff(changed_files.files)
+            diff = create_diff(changed_files.files) if isinstance(patch, Patch) else patch
             client = (
                 self.docker_server._local_client
                 if not self.use_remote or not self.docker_server.remote

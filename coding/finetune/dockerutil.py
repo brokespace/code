@@ -27,13 +27,21 @@ def exec_container_with_timeout(container, command, timeout):
         TimeoutError: If the command takes longer than the timeout.
     """
     exec_result = None
-    logs = None
+    logs = b""
     exception = None
+    stop_event = threading.Event()
 
     def target():
         nonlocal exec_result, logs, exception
         try:
-            exec_result, logs = container.exec_run(command)
+            exec_obj = container.exec_run(command, stream=True)
+            exec_result = exec_obj.exit_code
+            
+            for chunk in exec_obj.output:
+                if stop_event.is_set():
+                    break
+                logs += chunk
+                # print(f"\033[1;36m[{container.name}]\033[0m {chunk.decode('utf-8', errors='replace')}", end='', flush=True)
         except Exception as e:
             exception = e
 
@@ -42,6 +50,9 @@ def exec_container_with_timeout(container, command, timeout):
     thread.join(timeout)
 
     if thread.is_alive():
+        # Signal the thread to stop processing output
+        stop_event.set()
+        
         # Kill the container if the timeout is exceeded
         try:
             container.kill()
@@ -58,8 +69,6 @@ def exec_container_with_timeout(container, command, timeout):
         raise exception
 
     return exec_result, logs
-
-
 def build_docker_container(logic_files: dict, hotkey: str, repo_files: dict) -> str:
     """
     Builds a Docker container for evaluating model logic.
@@ -209,6 +218,7 @@ def run_docker_container_from_base(
     client,
     remote_host_url: str | None = None,
     api_key: str = "",
+    volumes: dict = {}
 ) -> dict:
     """
     Runs a Docker container for evaluating model logic.
@@ -278,6 +288,7 @@ def run_docker_container_from_base(
                     "OPENROUTER_API_KEY": api_key,
                 },
                 command="sleep infinity",
+                volumes=volumes,
             )
 
             # Start the container
@@ -308,20 +319,31 @@ def run_docker_container_from_base(
                 container, "python3 -u /app/code/runner.py", 1200
             )
             logs = logs.decode("utf-8")
-            # print("===== CONTAINER LOGS =====")
+            # print(f"===== CONTAINER {container_name} LOGS =====")
             # print(logs)
-            # print("===== CONTAINER LOGS =====")
-            patch_line = next(
-                line for line in reversed(logs.split("\n")) if line.startswith("Patch:")
-            )
-            try:
-                # First try parsing as JSON
-                patch_dict = json.loads(patch_line.replace("Patch:", "").strip())
-            except json.JSONDecodeError:
-                # Fall back to safely evaluating as literal Python dict
-                patch_dict = ast.literal_eval(patch_line.replace("Patch:", "").strip())
-
-            return patch_dict
+            # print(f"===== END OF CONTAINER {container_name} LOGS =====")
+            # Look for either Patch or Diff in the logs
+            for line in reversed(logs.split("\n")):
+                if line.startswith("Patch:"):
+                    try:
+                        # First try parsing as JSON
+                        patch_dict = json.loads(line.replace("Patch:", "").strip())
+                    except json.JSONDecodeError:
+                        # Fall back to safely evaluating as literal Python dict
+                        patch_dict = ast.literal_eval(line.replace("Patch:", "").strip())
+                    return patch_dict
+                elif line.startswith("Diff:"):
+                    try:
+                        # Parse the diff JSON
+                        diff_dict = json.loads(line.replace("Diff:", "").strip())
+                        return diff_dict
+                    except json.JSONDecodeError:
+                        # Fall back to safely evaluating as literal Python dict
+                        diff_dict = ast.literal_eval(line.replace("Diff:", "").strip())
+                        return diff_dict
+            
+            # If we get here, neither Patch nor Diff was found
+            raise ValueError("No Patch or Diff found in container logs")
 
         except docker.errors.APIError as e:
             print(f"Docker API error: {str(e)}")

@@ -427,7 +427,10 @@ class FinetunePipeline:
                             ),
                             api_key=api_key.key
                         )
-                        patch = Patch(**result)
+                        if "diff" in result:
+                            patch = Patch(**result)
+                        else:
+                            patch = result['diff']
                         print(
                             f"Scoring response for hotkey {tracker.hotkey}, task index {task_idx}..."
                         )
