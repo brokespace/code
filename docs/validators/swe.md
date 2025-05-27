@@ -52,7 +52,7 @@ The order of the rules is important. Run the following commands to setup the rul
 Let docker manage the iptables rules update file `/etc/docker/daemon.json` with the following content:
 ```bash
 {
-  "iptables": false,
+  "iptables": true,
   "insecure-registries": ["<ip-of-docker-server>:5000"]
 }
 ```
@@ -117,6 +117,16 @@ sudo iptables -A OUTPUT -p tcp -s <ip-of-server-you-are-running-the-validator-on
 sudo iptables -A OUTPUT -p tcp -s <ip-of-server-you-are-running-the-validator-on> --dport 5000 -j ACCEPT
 sudo iptables -I INPUT 1  -p tcp -s <ip-of-server-you-are-running-the-validator-on> --dport 5000 -m conntrack --ctstate NEW,ESTABLISHED -j ACCEPT
 sudo iptables -I OUTPUT 1 -p tcp -d <ip-of-server-you-are-running-the-validator-on> --sport 5000 -m conntrack --ctstate ESTABLISHED     -j ACCEPT
+
+# 1. Masquerade traffic that leaves the docker-bridge
+sudo iptables -t nat -A POSTROUTING \
+       -s 172.17.0.0/16 ! -d 172.17.0.0/16 -j MASQUERADE
+
+# 2. Allow containers to open NEW connections to the validator on 25000
+sudo iptables -I FORWARD 1 \
+       -p tcp -s 172.17.0.0/16 -d <ip-of-server-you-are-running-the-validator-on> --dport 25000 \
+       -m conntrack --ctstate NEW,ESTABLISHED -j ACCEPT
+
 sudo iptables -A INPUT -p tcp --dport 2375 -j DROP
 sudo iptables -I OUTPUT 1 -p tcp --dport 25000 -j ACCEPT
 sudo iptables -A INPUT -p tcp --sport 25000 -j ACCEPT
