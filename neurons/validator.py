@@ -92,6 +92,7 @@ class Validator(BaseValidatorNeuron):
         )
         try:
             self.docker_server.remote.run("registry:2", ports={"5000/tcp": 5000}, name="swe-registry", host_config=docker.types.HostConfig(
+                version="auto",
                 network_mode="host"
             ))
         except Exception as e:
