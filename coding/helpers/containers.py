@@ -363,7 +363,7 @@ class RemoteDockerHandler:
                 image_to_use,
                 command=command,
                 name=name,
-                ports=ports,
+                # ports=ports,
                 environment=environment,
                 detach=detach,
                 **kwargs,
