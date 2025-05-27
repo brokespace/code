@@ -22,6 +22,7 @@ import os
 import sys
 import time
 import random
+import docker
 import asyncio
 import threading
 import traceback
@@ -90,7 +91,9 @@ class Validator(BaseValidatorNeuron):
             remote_host_registry=f"{os.getenv('DOCKER_HOST_IP')}:5000"
         )
         try:
-            self.docker_server.remote.run("registry:2", ports={"5000/tcp": 5000}, name="swe-registry")
+            self.docker_server.remote.run("registry:2", ports={"5000/tcp": 5000}, name="swe-registry", host_config=docker.types.HostConfig(
+                network_mode="host"
+            ))
         except Exception as e:
             bt.logging.error(f"Error running registry: {e}")
             print(traceback.format_exc())
@@ -106,6 +109,7 @@ class Validator(BaseValidatorNeuron):
             sleep(60*3)
         self.model_store = ModelStore(config=self.config)
         self.model_store.load()
+        self.llm_manager.clear_cost()
 
     def _forward(
         self, synapse: StreamCodeSynapse

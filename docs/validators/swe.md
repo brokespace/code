@@ -52,7 +52,7 @@ The order of the rules is important. Run the following commands to setup the rul
 Let docker manage the iptables rules update file `/etc/docker/daemon.json` with the following content:
 ```bash
 {
-  "iptables": true,
+  "iptables": false,
   "insecure-registries": ["<ip-of-docker-server>:5000"]
 }
 ```
@@ -115,6 +115,8 @@ sudo iptables -A INPUT -p tcp -s <ip-of-server-you-are-running-the-validator-on>
 sudo iptables -A INPUT -p tcp -s <ip-of-server-you-are-running-the-validator-on> --dport 5000 -j ACCEPT
 sudo iptables -A OUTPUT -p tcp -s <ip-of-server-you-are-running-the-validator-on> --dport 2375 -j ACCEPT
 sudo iptables -A OUTPUT -p tcp -s <ip-of-server-you-are-running-the-validator-on> --dport 5000 -j ACCEPT
+sudo iptables -I INPUT 1  -p tcp -s <ip-of-server-you-are-running-the-validator-on> --dport 5000 -m conntrack --ctstate NEW,ESTABLISHED -j ACCEPT
+sudo iptables -I OUTPUT 1 -p tcp -d <ip-of-server-you-are-running-the-validator-on> --sport 5000 -m conntrack --ctstate ESTABLISHED     -j ACCEPT
 sudo iptables -A INPUT -p tcp --dport 2375 -j DROP
 sudo iptables -I OUTPUT 1 -p tcp --dport 25000 -j ACCEPT
 sudo iptables -A INPUT -p tcp --sport 25000 -j ACCEPT
