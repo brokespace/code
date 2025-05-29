@@ -507,10 +507,12 @@ WORKDIR /testbed/
                 # This is not a valid patch, return 0
                 print("Miner is not allowed to touch test files, returning a score of 0")
                 return 0
+            if isinstance(patch, str):
+                return score_patch(patch, self.repo, self.row, self.docker_server._local_client, self.image_name)
             changed_files.files = [
                 file for file in changed_files.files if "test" not in file.file_name
             ]
-            diff = create_diff(changed_files.files) if isinstance(patch, Patch) else patch
+            diff = create_diff(changed_files.files)
             client = (
                 self.docker_server._local_client
                 if not self.use_remote or not self.docker_server.remote
