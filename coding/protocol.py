@@ -29,6 +29,17 @@ from typing import List, AsyncIterator, Any, Optional
 from coding.schemas import ChatMessage, File
 from coding.constants import COMPETITION_ID
 
+
+class ScoresSynapse(bt.Synapse):
+    """
+    ScoresSynapse is a Synapse that is used to get the scores of the miner.
+    """
+    scores: List[float] = pydantic.Field(
+        [],
+        title="scores",
+        description="The scores of the miners ordered by uid",
+    )
+
 class ProvisionKeySynapse(bt.Synapse):
     """
     ProvisionKeySynapse is a Synapse that is used to get the provisioning key of the miner.

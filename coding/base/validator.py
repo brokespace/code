@@ -32,6 +32,7 @@ from coding.base.neuron import BaseNeuron
 from coding.constants import BLACKLISTED_COLDKEYS
 from coding.utils.config import add_validator_args
 from coding.utils.exceptions import MaxRetryError
+from coding.base.utils.score_grabbing import gather_scores
 
 class BaseValidatorNeuron(BaseNeuron):
     """
@@ -352,6 +353,7 @@ class BaseValidatorNeuron(BaseNeuron):
 
     def update_scores(self):
         """Performs exponential moving average on the scores based on the rewards received from the miners."""
+        
         if not self.finetune_results:
             return
         latest_competition_id = max(self.finetune_results.keys())
@@ -370,6 +372,29 @@ class BaseValidatorNeuron(BaseNeuron):
             return
         self.scores = finetune_scores
         bt.logging.info(f"Updated moving avg scores: {self.scores}")
+        if self.config.neuron.audit:
+            tracked_scores = gather_scores(self)
+            # Only compare uids that have non-zero scores in both arrays
+            non_zero_mask = (self.scores > 0) & (np.array(tracked_scores) > 0)
+            common_uids = np.where(non_zero_mask)[0]
+
+            if len(common_uids) > 0:
+                scores_subset = self.scores[common_uids]
+                tracked_subset = np.array(tracked_scores)[common_uids]
+                
+                # Calculate relative differences
+                relative_diff = np.abs(scores_subset - tracked_subset) / np.maximum(scores_subset, tracked_subset)
+                
+                # Check if scores are within 10% of each other for at least 80% of common uids
+                similar_scores = relative_diff < 0.10
+                if np.mean(similar_scores) >= 0.80:
+                    bt.logging.info("Using tracked scores - local scores verified similar")
+                    self.scores = np.array(tracked_scores)
+                else:
+                    bt.logging.warning("Using local scores - tracked scores differ significantly")
+            else:
+                bt.logging.warning("No common non-zero scores to compare, using local scores")
+        
 
     def save_state(self):
         """Saves the state of the validator to a file."""

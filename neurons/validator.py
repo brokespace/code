@@ -36,7 +36,7 @@ from concurrent.futures import ThreadPoolExecutor
 from coding.utils.logging import clean_wandb
 from coding.validator import forward
 from coding.rewards.pipeline import RewardPipeline
-from coding.protocol import StreamCodeSynapse
+from coding.protocol import ScoresSynapse
 
 # import base validator class which takes care of most of the boilerplate
 from coding.finetune.model import ModelStore
@@ -110,29 +110,16 @@ class Validator(BaseValidatorNeuron):
         self.llm_manager.clear_cost()
 
     def _forward(
-        self, synapse: StreamCodeSynapse
+        self, synapse: ScoresSynapse
     ) -> (
-        StreamCodeSynapse
-    ):  # TODO remove this since its duplicate code, could be handled better
+        ScoresSynapse
+    ):  
         """
         forward method that is called when the validator is queried with an axon
         """
-        return forward(self, synapse)
-        # # response = forward_organic_synapse(self, synapse=synapse)
+        return ScoresSynapse(scores=self.scores.tolist())
 
-        # def _run():
-        #     asyncio.run(forward(self, synapse))
-
-        # if random.random() < self.config.neuron.percent_organic_score:
-        #     try:
-        #         loop = asyncio.get_running_loop()
-        #         loop.create_task(forward(self, synapse))
-        #     except RuntimeError:  # No event loop running
-        #         threading.Thread(target=_run).start()
-        #     # return the response
-        # return response
-
-    async def forward(self, synapse: StreamCodeSynapse) -> Awaitable:
+    async def forward(self, synapse: ScoresSynapse) -> Awaitable:
         """
         Validator forward pass. Consists of:
         - Generating the query
@@ -141,10 +128,9 @@ class Validator(BaseValidatorNeuron):
         - Rewarding the miners
         - Updating the scores
         """
-        return forward(self, synapse)
+        return ScoresSynapse(scores=self.scores.tolist())
 
-    # TODO make it so that the only thing accepted is the subnet owners hotkey + the validators coldkey
-    async def blacklist(self, synapse: StreamCodeSynapse) -> Tuple[bool, str]:
+    async def blacklist(self, synapse: ScoresSynapse) -> Tuple[bool, str]:
         """
         Determines whether an incoming request should be blacklisted and thus ignored. Your implementation should
         define the logic for blacklisting requests based on your needs and desired security parameters.
@@ -176,9 +162,11 @@ class Validator(BaseValidatorNeuron):
         """
         if synapse.dendrite.hotkey == "5Fy7c6skhxBifdPPEs3TyytxFc7Rq6UdLqysNPZ5AMAUbRQx":
             return False, "Subnet owner hotkey"
+        if synapse.dendrite.hotkey in ["5F2CsUDVbRbVMXTh9fAzF9GacjVX7UapvRxidrxe7z8BYckQ", "5F4tQyWrhfGVcNhoqeiNsR6KjD4wMZ2kfhLj4oHYuyHbZAc3", "5FFApaS75bv5pJHfAp2FVLBj9ZaXuFDjEypsaBNc1wCfe52v"]:
+            return False, "Allowed validator hotkey"
         return True, "Blacklisted"
 
-    async def priority(self, synapse: StreamCodeSynapse) -> float:
+    async def priority(self, synapse: ScoresSynapse) -> float:
         """
         The priority function determines the order in which requests are handled. More valuable or higher-priority
         requests are processed before others. You should design your own priority mechanism with care.

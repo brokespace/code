@@ -300,6 +300,13 @@ def add_validator_args(cls, parser):
         help="The number of finetune tasks to generate and score with.",
         default=100,
     )
+    
+    parser.add_argument(
+        "--neuron.audit",
+        type=bool,
+        help="If set, the validator will audit the scores of the miners.",
+        default=False,
+    )
 
 
 def config(cls):
