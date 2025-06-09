@@ -303,10 +303,11 @@ def add_validator_args(cls, parser):
     
     parser.add_argument(
         "--neuron.audit",
-        type=bool,
+        action="store_true",
         help="If set, the validator will audit the scores of the miners.",
         default=False,
     )
+
 
 
 def config(cls):
