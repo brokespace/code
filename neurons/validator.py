@@ -128,7 +128,7 @@ class Validator(BaseValidatorNeuron):
         - Rewarding the miners
         - Updating the scores
         """
-        return ScoresSynapse(scores=self.scores.tolist())
+        return forward(self, synapse)
 
     async def blacklist(self, synapse: ScoresSynapse) -> Tuple[bool, str]:
         """
