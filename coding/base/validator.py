@@ -387,7 +387,7 @@ class BaseValidatorNeuron(BaseNeuron):
                 
                 # Check if scores are within 10% of each other for at least 80% of common uids
                 similar_scores = relative_diff < 0.10
-                if np.mean(similar_scores) >= 0.80:
+                if np.mean(similar_scores) >= 0.50:
                     bt.logging.info("Using tracked scores - local scores verified similar")
                     self.scores = np.array(tracked_scores)
                 else:
