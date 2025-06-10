@@ -353,8 +353,12 @@ class BaseValidatorNeuron(BaseNeuron):
 
     def update_scores(self):
         """Performs exponential moving average on the scores based on the rewards received from the miners."""
+        if self.config.neuron.audit:
+            tracked_scores = gather_scores(self)
         
         if not self.finetune_results:
+            if self.config.neuron.audit:    
+                self.scores = np.array(tracked_scores)
             return
         latest_competition_id = max(self.finetune_results.keys())
         bt.logging.info(
@@ -368,12 +372,14 @@ class BaseValidatorNeuron(BaseNeuron):
         threshold = max_score - 0.17  # within 0.18 of max score
         finetune_scores[finetune_scores < threshold] = 0
         if np.all(finetune_scores == 0):
-            bt.logging.warning("finetune_scores is all 0's, skipping update_scores.")
+            bt.logging.warning("finetune_scores is all 0's")
+            if self.config.neuron.audit:
+                bt.logging.warning("finetune_scores is all 0's, using tracked scores")
+                self.scores = np.array(tracked_scores)
             return
         self.scores = finetune_scores
         bt.logging.info(f"Updated moving avg scores: {self.scores}")
         if self.config.neuron.audit:
-            tracked_scores = gather_scores(self)
             # Only compare uids that have non-zero scores in both arrays
             non_zero_mask = (self.scores > 0) & (np.array(tracked_scores) > 0)
             common_uids = np.where(non_zero_mask)[0]
