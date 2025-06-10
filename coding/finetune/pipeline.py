@@ -310,6 +310,8 @@ class FinetunePipeline:
         print(f"Loaded {len(grabbed_trackers)} logics. Doing a final walkthrough to ensure all logics are valid...")
         for tracker in graded_trackers:
             model = self.model_store.get(tracker.logic)
+            if not model:
+                model = self.model_store.upsert(tracker.logic)
             if not model or not model.valid:
                 tracker.score = 0
                 print(f"Logic for {tracker.hotkey} is invalid, setting score to 0")
@@ -489,7 +491,9 @@ class FinetunePipeline:
                     )
             cost = self.llm_manager.get_cost()
             self.llm_manager.clear_cost()
-            tracker.score = adjust_score_by_cost(sum(scores) / len(scores), cost["cost"] / len(scores))
+            tracker.avg_cost = cost["cost"] / len(scores)
+            tracker.raw_score = sum(scores) / len(scores)
+            tracker.score = adjust_score_by_cost(tracker.raw_score, tracker.avg_cost)
             tracker.score_timestamps.append(self.metagraph.block)
             
             self.graded_trackers.append(tracker)
