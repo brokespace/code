@@ -376,6 +376,8 @@ class BaseValidatorNeuron(BaseNeuron):
             if self.config.neuron.audit:
                 bt.logging.warning("finetune_scores is all 0's, using tracked scores")
                 self.scores = np.array(tracked_scores)
+                # print out the scores
+                print("self.scores after being set to tracked scores", self.scores)
             return
         self.scores = finetune_scores
         bt.logging.info(f"Updated moving avg scores: {self.scores}")
