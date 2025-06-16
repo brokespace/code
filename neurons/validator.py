@@ -162,7 +162,7 @@ class Validator(BaseValidatorNeuron):
         """
         if synapse.dendrite.hotkey == "5Fy7c6skhxBifdPPEs3TyytxFc7Rq6UdLqysNPZ5AMAUbRQx":
             return False, "Subnet owner hotkey"
-        if synapse.dendrite.hotkey in ["5F2CsUDVbRbVMXTh9fAzF9GacjVX7UapvRxidrxe7z8BYckQ", "5F4tQyWrhfGVcNhoqeiNsR6KjD4wMZ2kfhLj4oHYuyHbZAc3", "5FFApaS75bv5pJHfAp2FVLBj9ZaXuFDjEypsaBNc1wCfe52v"]:
+        if synapse.dendrite.hotkey in ["5F2CsUDVbRbVMXTh9fAzF9GacjVX7UapvRxidrxe7z8BYckQ", "5F4tQyWrhfGVcNhoqeiNsR6KjD4wMZ2kfhLj4oHYuyHbZAc3", "5FFApaS75bv5pJHfAp2FVLBj9ZaXuFDjEypsaBNc1wCfe52v", "5C4z2FJzsxh9uWxGTThdK7EBKuMNpWbCEFnrKrQene6Rsn45"]:
             return False, "Allowed validator hotkey"
         return True, "Blacklisted"
 
