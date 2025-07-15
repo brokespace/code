@@ -240,7 +240,7 @@ def score_patch(
     }
     try:
         result = run_instance(
-            repo, instance, prediction, False, False, client, "nil", 300, image_name
+            repo, instance, prediction, False, False, client, "nil", 600, image_name
         )
         if result[1][instance["instance_id"]]["resolved"]:
             return 1
