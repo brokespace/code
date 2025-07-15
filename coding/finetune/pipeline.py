@@ -375,16 +375,10 @@ class FinetunePipeline:
                 None,
             )
             if previous_tracker is not None:
-                if (
-                    len(previous_tracker.score_timestamps) > 0
-                    and len(tracker.score_timestamps) == 0
-                ):
+                if (len(previous_tracker.score_timestamps) > 0):
                     tracker.score_timestamps = previous_tracker.score_timestamps
-                print(
-                    f"Finetune: Using previously evaluated score for hotkey: {tracker.hotkey}"
-                )
-                # if a tracker had a score before, add the block number to the score_timestamps
-                if len(tracker.score_timestamps) == 0:
+                    print(f"Finetune: Using previously evaluated score for hotkey: {tracker.hotkey}")
+                else:
                     tracker.score_timestamps.append(self.metagraph.block)
                 tracker.score = previous_tracker.score
                 self.graded_trackers.append(tracker)
@@ -407,7 +401,7 @@ class FinetunePipeline:
                     task_idx, task = task_data
                     try:
                         print(
-                            f"Making request to container for hotkey {tracker.hotkey}, task index {task_idx}, instance id {task.row["instance_id"]}"
+                            f"Making request to container for hotkey {tracker.hotkey}, task index {task_idx}, instance id {task.row['instance_id']}"
                         )
                         result = run_docker_container_from_base(
                             image_name=task.image_name,
