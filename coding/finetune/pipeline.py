@@ -51,6 +51,12 @@ class FinetuneEventResults(BaseModel):
             "competition_id": COMPETITION_ID,
         }
 
+def merge_score_timestamps(timestamps1: list[int], timestamps2: list[int]) -> list[int]:
+    """
+    Merge two lists of timestamps, deduplicating and keeping the most recent ones.
+    """
+    return sorted(list(set(timestamps1 + timestamps2)))
+
 def adjust_score_by_cost(score: float, llm_cost: float) -> float:
     """
     Adjust the score based on the LLM cost.
@@ -151,7 +157,7 @@ def generate_swe_tasks(
 def deduplicate_timestamps(timestamps: List[int]) -> List[int]:
     """
     Deduplicate timestamps by removing duplicates and keeping the most recent ones.
-    If any timestamps are within 20 blocks of each other, keep the earliest one.
+    If any timestamps are within 2 blocks of each other, keep the earliest one.
     
     Args:
         timestamps (List[int]): The list of timestamps to deduplicate.
@@ -168,10 +174,10 @@ def deduplicate_timestamps(timestamps: List[int]) -> List[int]:
     
     # Iterate through sorted timestamps
     for ts in sorted_timestamps:
-        # Check if current timestamp is at least 20 blocks away from all timestamps in result
+        # Check if current timestamp is at least 2 blocks away from all timestamps in result
         should_add = True
         for existing_ts in result:
-            if abs(ts - existing_ts) <= 20:
+            if abs(ts - existing_ts) <= 2:
                 should_add = False
                 break
         
@@ -250,7 +256,6 @@ class FinetunePipeline:
         graded_trackers = []
         ungraded_trackers = []
         for tracker in grabbed_trackers:
-            print(f"Loading logic for {tracker.hotkey}")
             model = self.model_store.upsert(tracker.logic)
             self.model_store.remove_hotkey(tracker.hotkey)
             model.hotkeys.append(tracker.hotkey)
@@ -262,7 +267,8 @@ class FinetunePipeline:
                 if tracker.hotkey == saved_tracker.hotkey:
                     saved_tracker.uid = tracker.uid
                     tracker.score = saved_tracker.score
-                    tracker.score_timestamps = saved_tracker.score_timestamps
+                    tracker.score_timestamps = merge_score_timestamps(saved_tracker.score_timestamps, tracker.score_timestamps)
+                    saved_tracker.score_timestamps = tracker.score_timestamps
                     if (
                         len(saved_tracker.score_timestamps) > 0
                         and saved_tracker.score_timestamps[-1]
