@@ -291,7 +291,7 @@ class FinetunePipeline:
                     exists = True
                     if saved_tracker.score == 0:
                         if saved_tracker.logic != tracker.logic:
-                            self.model_store.delete(saved_tracker.logic)
+                            # self.model_store.delete(saved_tracker.logic)
                             model = self.model_store.upsert(tracker.logic)
                         ungraded_trackers.append(tracker)
                         break
@@ -302,7 +302,7 @@ class FinetunePipeline:
                         model = self.model_store.get(tracker.logic)
                         # if models are different, delete the old one and insert the new one to get the logic revalidated
                         if not logic_similar(tracker.logic, saved_tracker.logic):
-                            self.model_store.delete(saved_tracker.logic)
+                            # self.model_store.delete(saved_tracker.logic)
                             model = self.model_store.upsert(tracker.logic)
                         if not model or not model.valid or saved_tracker.score == 0:
                             tracker.score = 0
