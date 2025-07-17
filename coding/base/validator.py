@@ -365,12 +365,45 @@ class BaseValidatorNeuron(BaseNeuron):
             f"latest_competition_id: {latest_competition_id} from {self.finetune_results.keys()}"
         )
         finetune_scores = np.zeros(self.metagraph.n)
+        max_score = max(self.finetune_results[latest_competition_id].trackers, key=lambda x: x.score).score
+        # group the trackers by if theyre not the same logic. only do this for trackers that have the max score
+        tracker_groups = {}
         for tracker in self.finetune_results[latest_competition_id].trackers:
             finetune_scores[tracker.uid] = tracker.score
+            if tracker.score != max_score:
+                continue
+            if tracker.logic not in tracker_groups:
+                tracker_groups[tracker.logic] = []
+            tracker_groups[tracker.logic].append(tracker)
+        # Calculate how many trackers to select from each group
+        trackers_per_group = 10 // len(tracker_groups)
+        remainder = 10 % len(tracker_groups)
 
-        max_score = np.max(finetune_scores)
-        threshold = max_score - 0.17  # within 0.18 of max score
-        finetune_scores[finetune_scores < threshold] = 0
+        # Select trackers from each group
+        selected_trackers = []
+        not_selected_trackers = []
+        for group_trackers in tracker_groups.values():
+            # Get number of trackers to select from this group (including remainder distribution)
+            n_select = trackers_per_group
+            if remainder > 0:
+                n_select += 1
+                remainder -= 1
+                
+            # Randomly select trackers from group
+            group_selected = group_trackers[:n_select] if len(group_trackers) >= n_select else group_trackers
+            selected_trackers.extend(group_selected)
+            not_selected_trackers.extend(group_trackers[n_select:])
+        # Set scores for selected trackers
+        for tracker in selected_trackers:
+            finetune_scores[tracker.uid] = max_score
+        
+        # set scores for not selected trackers to a slighly lower score
+        for tracker in not_selected_trackers:
+            finetune_scores[tracker.uid] = max_score - 0.01
+        
+
+        # threshold = max_score - 0.17  # within 0.18 of max score
+        # finetune_scores[finetune_scores < threshold] = 0
         if np.all(finetune_scores == 0):
             bt.logging.warning("finetune_scores is all 0's")
             if self.config.neuron.audit:
