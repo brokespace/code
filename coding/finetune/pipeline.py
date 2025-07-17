@@ -51,7 +51,7 @@ class FinetuneEventResults(BaseModel):
             "competition_id": COMPETITION_ID,
         }
 
-def merge_score_timestamps(timestamps1: list[int], timestamps2: list[int]) -> np.ndarray:
+def merge_score_timestamps(timestamps1: list[int], timestamps2: list[int]) -> list[int]:
     """
     Merge two lists of timestamps, deduplicating and keeping the most recent ones.
     Returns a numpy array of the merged timestamps.
@@ -64,7 +64,7 @@ def merge_score_timestamps(timestamps1: list[int], timestamps2: list[int]) -> np
     combined = [int(x) for x in timestamps1 + timestamps2]
     
     # Deduplicate and sort
-    return np.array(sorted(list(set(combined))))
+    return sorted(list(set(combined)))
 
 def adjust_score_by_cost(score: float, llm_cost: float) -> float:
     """
@@ -174,6 +174,10 @@ def deduplicate_timestamps(timestamps: List[int]) -> List[int]:
     Returns:
         List[int]: The deduplicated timestamps.
     """
+    # check if timestamps is a numpy array
+    if isinstance(timestamps, np.ndarray):
+        timestamps = timestamps.tolist()
+        
     if not timestamps:
         return []
     
