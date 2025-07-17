@@ -372,9 +372,11 @@ class BaseValidatorNeuron(BaseNeuron):
             finetune_scores[tracker.uid] = tracker.score
             if tracker.score != max_score:
                 continue
-            if tracker.logic not in tracker_groups:
-                tracker_groups[tracker.logic] = []
-            tracker_groups[tracker.logic].append(tracker)
+            # Convert dict to tuple of sorted items for hashing
+            logic_key = tuple(sorted(tracker.logic.items()))
+            if logic_key not in tracker_groups:
+                tracker_groups[logic_key] = []
+            tracker_groups[logic_key].append(tracker)
         # Calculate how many trackers to select from each group
         trackers_per_group = 10 // len(tracker_groups)
         remainder = 10 % len(tracker_groups)
