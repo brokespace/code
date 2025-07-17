@@ -4,13 +4,13 @@ import pickle
 import difflib
 import traceback
 import threading
+import numpy as np
 import concurrent.futures
 import bittensor as bt
 from typing import List
 from pydantic import BaseModel
 from .tracker import gather_all_logics
 from concurrent.futures import ThreadPoolExecutor, as_completed
-
 from .dockerutil import run_docker_container_from_base
 
 from coding.finetune.keys import APIKey
@@ -51,11 +51,16 @@ class FinetuneEventResults(BaseModel):
             "competition_id": COMPETITION_ID,
         }
 
-def merge_score_timestamps(timestamps1: list[int], timestamps2: list[int]) -> list[int]:
+def merge_score_timestamps(timestamps1: list[int], timestamps2: list[int]) -> np.ndarray:
     """
     Merge two lists of timestamps, deduplicating and keeping the most recent ones.
+    Returns a numpy array of the merged timestamps.
     """
-    return sorted(list(set(timestamps1 + timestamps2)))
+    # Convert any numpy arrays to lists
+    timestamps1 = timestamps1.tolist() if hasattr(timestamps1, 'tolist') else timestamps1
+    timestamps2 = timestamps2.tolist() if hasattr(timestamps2, 'tolist') else timestamps2
+    
+    return np.array(sorted(list(set(timestamps1 + timestamps2))))
 
 def adjust_score_by_cost(score: float, llm_cost: float) -> float:
     """
