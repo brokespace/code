@@ -402,8 +402,8 @@ class BaseValidatorNeuron(BaseNeuron):
             finetune_scores[tracker.uid] = max_score - 0.01
         
 
-        # threshold = max_score - 0.17  # within 0.18 of max score
-        # finetune_scores[finetune_scores < threshold] = 0
+        threshold = max_score - 0.17  # within 0.18 of max score
+        finetune_scores[finetune_scores < threshold] = 0
         if np.all(finetune_scores == 0):
             bt.logging.warning("finetune_scores is all 0's")
             if self.config.neuron.audit:
