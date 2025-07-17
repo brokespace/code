@@ -60,7 +60,11 @@ def merge_score_timestamps(timestamps1: list[int], timestamps2: list[int]) -> np
     timestamps1 = timestamps1.tolist() if hasattr(timestamps1, 'tolist') else timestamps1
     timestamps2 = timestamps2.tolist() if hasattr(timestamps2, 'tolist') else timestamps2
     
-    return np.array(sorted(list(set(timestamps1 + timestamps2))))
+    # Combine lists and convert elements to integers to ensure they're hashable
+    combined = [int(x) for x in timestamps1 + timestamps2]
+    
+    # Deduplicate and sort
+    return np.array(sorted(list(set(combined))))
 
 def adjust_score_by_cost(score: float, llm_cost: float) -> float:
     """
