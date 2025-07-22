@@ -43,12 +43,18 @@ from coding.finetune.dockerutil import exec_run_with_timeout
 from coding.schemas import Context, Patch, ChangedFile, ChangedFiles, apply_edits
 
 def normalize_image_name(image_name):
-    if ':' in image_name and '/' in image_name:
-        parts = image_name.split('/')
-        if ':' in parts[0]:
-            return '/'.join(parts[1:])
+    import re
+    # Find all IP:port patterns
+    ip_port_pattern = r'\d+\.\d+\.\d+\.\d+:\d+'
+    matches = re.findall(ip_port_pattern, image_name)
+    
+    # If there are multiple IP:port matches, keep only the first one
+    if len(matches) > 1:
+        for match in matches[1:]:
+            image_name = image_name.replace(match + '/', '')
+            image_name = image_name.replace(match, '')
+    
     return image_name
-
 
 GIT_APPLY_CMDS = [
     "git apply --verbose",
