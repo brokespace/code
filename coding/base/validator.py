@@ -264,6 +264,7 @@ class BaseValidatorNeuron(BaseNeuron):
         divisions = int(np.floor(self.block / 1000))
         # Check if self.scores contains any NaN values and log a warning if it does.
         raw_weights = np.divide(self.scores, np.sum(self.scores, axis=0))
+        print("raw_weights", raw_weights)
         raw_weights[raw_weights < 0] = 0
         current_scores = raw_weights
         weighted_scores = score_spreading(
@@ -276,6 +277,7 @@ class BaseValidatorNeuron(BaseNeuron):
         )
         # find the uids of the top 10 weights
         top_10_uids = np.argsort(weighted_scores)[-10:]
+        print("top_10_uids", top_10_uids)
         # set all but the top 10 to 0
         weighted_scores[~np.isin(np.arange(len(weighted_scores)), top_10_uids)] = 0
         # Process the raw weights to final_weights via subtensor limitations.
