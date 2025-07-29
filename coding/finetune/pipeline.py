@@ -269,6 +269,7 @@ class FinetunePipeline:
         graded_trackers = []
         ungraded_trackers = []
         for tracker in grabbed_trackers:
+            print("Checking tracker for hotkey", tracker.hotkey)
             model = self.model_store.upsert(tracker.logic)
             self.model_store.remove_hotkey(tracker.hotkey)
             model.hotkeys.append(tracker.hotkey)
