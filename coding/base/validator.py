@@ -262,6 +262,7 @@ class BaseValidatorNeuron(BaseNeuron):
             bt.logging.warning("self.scores is all 0's, skipping set_weights.")
             return
         divisions = int(np.floor(self.block / 1000))
+        print("scores", self.scores)
         # Check if self.scores contains any NaN values and log a warning if it does.
         raw_weights = np.divide(self.scores, np.sum(self.scores, axis=0))
         print("raw_weights", raw_weights)
@@ -403,7 +404,7 @@ class BaseValidatorNeuron(BaseNeuron):
         
         # set scores for not selected trackers to a slighly lower score
         for tracker in not_selected_trackers:
-            finetune_scores[tracker.uid] = max_score - 0.01
+            finetune_scores[tracker.uid] = tracker.score - 0.01
         
 
         threshold = max_score - 0.17  # within 0.18 of max score
