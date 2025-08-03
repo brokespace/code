@@ -407,9 +407,16 @@ class FinetunePipeline:
                 continue
 
             # Otherwise, evaluate the logic
-            print(f"Initializing LLM key for hotkey {tracker.hotkey}...")
-            self.llm_manager.init_key(api_key.key)
-            print(f"Starting docker container for hotkey {tracker.hotkey}...")
+            try:
+                print(f"Initializing LLM key for hotkey {tracker.hotkey}...")
+                self.llm_manager.init_key(api_key.key)
+                print(f"Starting docker container for hotkey {tracker.hotkey}...")
+            except Exception as e:
+                bt.logging.error(f"Error initializing LLM key for hotkey {tracker.hotkey}: {e}")
+                print(traceback.format_exc())
+                self.graded_trackers.append(tracker)
+                continue
+            
             scores = []
             # Create a thread pool to process tasks in parallel
             print("Starting thread pool for task processing...")
