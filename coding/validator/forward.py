@@ -20,6 +20,9 @@ async def forward(self, synapse: StreamCodeSynapse):
         self (:obj:`bittensor.neuron.Neuron`): The neuron object which contains all the necessary state for the validator.
 
     """
+    
+    self.update_scores()
+    
     bt.logging.info("🚀 Starting forward loop...")
     if not FinetunePipeline.tasks_exist(self.config):
         FinetunePipeline.generate_tasks(self.config)
