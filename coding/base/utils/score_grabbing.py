@@ -6,6 +6,7 @@ from coding.protocol import ScoresSynapse
 from coding.constants import TRACKED_VALIDATOR_HOTKEY
 
 def gather_scores(self) -> list[float]:
+    bt.logging.info("Gathering scores")
     try:
         uid = get_uid_from_hotkey(self, TRACKED_VALIDATOR_HOTKEY)
         axons = [self.metagraph.axons[uid]]
@@ -15,6 +16,7 @@ def gather_scores(self) -> list[float]:
                 axons=axons, synapse=synapse, timeout=45, deserialize=False
             )
         )
+        bt.logging.info(f"Gathering scores responses: {responses}")
         return responses[0].scores
     except Exception as e:
         bt.logging.error(f"Error gathering scores: {e}")

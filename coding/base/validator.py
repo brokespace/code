@@ -420,6 +420,7 @@ class BaseValidatorNeuron(BaseNeuron):
         self.scores = finetune_scores
         bt.logging.info(f"Updated moving avg scores: {self.scores}")
         if self.config.neuron.audit:
+            bt.logging.info("Audit was set, comparing scores")
             # Only compare uids that have non-zero scores in both arrays
             non_zero_mask = (self.scores > 0) & (np.array(tracked_scores) > 0)
             common_uids = np.where(non_zero_mask)[0]
