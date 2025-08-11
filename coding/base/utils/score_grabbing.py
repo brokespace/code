@@ -7,7 +7,9 @@ from coding.constants import TRACKED_VALIDATOR_HOTKEY
 
 def gather_scores(self) -> list[float]:
     bt.logging.info("Gathering scores")
+    
     try:
+        self.dendrite = bt.dendrite(wallet=self.wallet)
         uid = get_uid_from_hotkey(self, TRACKED_VALIDATOR_HOTKEY)
         axons = [self.metagraph.axons[uid]]
         synapse = ScoresSynapse()
