@@ -362,9 +362,14 @@ class BaseValidatorNeuron(BaseNeuron):
 
     def update_scores(self):
         """Performs exponential moving average on the scores based on the rewards received from the miners."""
+        bt.logging.info(f"update_scores()")
         if self.config.neuron.audit:
             tracked_scores = gather_scores(self)
-        
+        if self.config.neuron.audit:
+            bt.logging.info("Audit was set, using tracked scores")
+            # Temporary override to use tracked scores for audit
+            self.scores = np.array(tracked_scores)
+            return
         if not self.finetune_results:
             if self.config.neuron.audit:    
                 self.scores = np.array(tracked_scores)
