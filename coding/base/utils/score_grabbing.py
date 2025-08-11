@@ -13,7 +13,7 @@ async def gather_scores(self) -> list[float]:
         uid = get_uid_from_hotkey(self, TRACKED_VALIDATOR_HOTKEY)
         axons = [self.metagraph.axons[uid]]
         synapse = ScoresSynapse()
-        response = dendrite.aquery(
+        response = await dendrite.aquery(
             axons=axons, synapse=synapse, timeout=45, deserialize=False
         )
         bt.logging.info(f"Gathering scores responses: {response}")
