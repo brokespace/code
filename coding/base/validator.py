@@ -364,7 +364,7 @@ class BaseValidatorNeuron(BaseNeuron):
         """Performs exponential moving average on the scores based on the rewards received from the miners."""
         bt.logging.info(f"update_scores()")
         if self.config.neuron.audit:
-            tracked_scores = gather_scores(self)
+            tracked_scores = asyncio.run(gather_scores(self))
         if self.config.neuron.audit:
             bt.logging.info("Audit was set, using tracked scores")
             # Temporary override to use tracked scores for audit
