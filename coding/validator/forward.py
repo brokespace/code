@@ -21,7 +21,7 @@ async def forward(self, synapse: StreamCodeSynapse):
 
     """
     
-    self.update_scores()
+    await self.update_scores()
     
     bt.logging.info("🚀 Starting forward loop...")
     if not FinetunePipeline.tasks_exist(self.config):
@@ -53,7 +53,7 @@ async def forward(self, synapse: StreamCodeSynapse):
         self.finetune_results[COMPETITION_ID] = self.finetune_eval_future.result()
         delattr(self, "finetune_eval_future")  # Remove the future after getting results
 
-    self.update_scores()
+    await self.update_scores()
 
     log_event(
         self,
