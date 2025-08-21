@@ -96,6 +96,7 @@ class BaseValidatorNeuron(BaseNeuron):
                     netuid=self.config.netuid,
                     subtensor=self.subtensor,
                 )
+                self.axon.start()
             except Exception as e:
                 bt.logging.error(f"Failed to serve Axon with exception: {e}")
 
@@ -130,28 +131,28 @@ class BaseValidatorNeuron(BaseNeuron):
             bt.logging.error("Error while syncing, killing self to restart", str(e))
             bt.logging.debug(print_exception(type(e), e, e.__traceback__))
             sys.exit(1)
-        if not self.config.neuron.axon_off:
-            try:
-                bt.logging.info(
-                    f"Running validator {self.axon} on network: {self.config.subtensor.chain_endpoint} with netuid: {self.config.netuid}"
-                )
-                try:
-                    # serve the axon
-                    self.axon.serve(netuid=self.config.netuid, subtensor=self.subtensor)
-                except Exception as e:
-                    bt.logging.error(f"Failed to serve Axon with exception: {e}")
-                try:
-                    self.axon.start()
-                except Exception as e:
-                    bt.logging.error(f"Failed to start Axon with exception: {e}")
-            except Exception as e:
-                bt.logging.error(
-                    f"Failed to serve and then start Axon with exception: {e}"
-                )
-        else:
-            bt.logging.info(
-                f"Running validator on network: {self.config.subtensor.chain_endpoint} with netuid: {self.config.netuid}"
-            )
+        # if not self.config.neuron.axon_off:
+        #     try:
+        #         bt.logging.info(
+        #             f"Running validator {self.axon} on network: {self.config.subtensor.chain_endpoint} with netuid: {self.config.netuid}"
+        #         )
+        #         try:
+        #             # serve the axon
+        #             self.axon.serve(netuid=self.config.netuid, subtensor=self.subtensor)
+        #         except Exception as e:
+        #             bt.logging.error(f"Failed to serve Axon with exception: {e}")
+        #         try:
+        #             self.axon.start()
+        #         except Exception as e:
+        #             bt.logging.error(f"Failed to start Axon with exception: {e}")
+        #     except Exception as e:
+        #         bt.logging.error(
+        #             f"Failed to serve and then start Axon with exception: {e}"
+        #         )
+        # else:
+        #     bt.logging.info(
+        #         f"Running validator on network: {self.config.subtensor.chain_endpoint} with netuid: {self.config.netuid}"
+        #     )
 
         bt.logging.info(f"Validator starting at block: {self.block}")
 
