@@ -96,10 +96,12 @@ class BaseValidatorNeuron(BaseNeuron):
                     netuid=self.config.netuid,
                     subtensor=self.subtensor,
                 )
-                self.axon.start()
             except Exception as e:
                 bt.logging.error(f"Failed to serve Axon with exception: {e}")
-
+            try:
+                self.axon.start()
+            except Exception as e:
+                bt.logging.error(f"Failed to start Axon with exception: {e}")
         except Exception as e:
             bt.logging.error(f"Failed to create Axon initialize with exception: {e}")
 
