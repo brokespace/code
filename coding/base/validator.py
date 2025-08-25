@@ -388,8 +388,21 @@ class BaseValidatorNeuron(BaseNeuron):
         # find the number of trackers that have the max score
         num_max_score_trackers = sum(1 for tracker in self.finetune_results[latest_competition_id].trackers if tracker.score == max_score)
         if num_max_score_trackers <= 10:
+            # Sort trackers by score in descending order and take top 10
+            sorted_trackers = sorted(
+                self.finetune_results[latest_competition_id].trackers,
+                key=lambda x: x.score,
+                reverse=True
+            )
+            top_10_trackers = sorted_trackers[:10]
+            
+            # Set scores for top 10 trackers, rest get 0
+            top_10_uids = {tracker.uid for tracker in top_10_trackers}
             for tracker in self.finetune_results[latest_competition_id].trackers:
-                finetune_scores[tracker.uid] = tracker.score
+                if tracker.uid in top_10_uids:
+                    finetune_scores[tracker.uid] = tracker.score
+                else:
+                    finetune_scores[tracker.uid] = 0
         else:
             # group the trackers by if theyre not the same logic. only do this for trackers that have the max score
             tracker_groups = {}
