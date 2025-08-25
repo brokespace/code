@@ -385,42 +385,49 @@ class BaseValidatorNeuron(BaseNeuron):
         max_score = max(self.finetune_results[latest_competition_id].trackers, key=lambda x: x.score).score
         for tracker in self.finetune_results[latest_competition_id].trackers:
             print(f"tracker {tracker.uid} has score {tracker.score}")
-        # group the trackers by if theyre not the same logic. only do this for trackers that have the max score
-        tracker_groups = {}
-        for tracker in self.finetune_results[latest_competition_id].trackers:
-            finetune_scores[tracker.uid] = tracker.score
-            if tracker.score != max_score:
-                continue
-            # Convert dict to tuple of sorted items for hashing
-            logic_key = tuple(sorted(tracker.logic.items()))
-            if logic_key not in tracker_groups:
-                tracker_groups[logic_key] = []
-            tracker_groups[logic_key].append(tracker)
-        # Calculate how many trackers to select from each group
-        trackers_per_group = 10 // len(tracker_groups)
-        remainder = 10 % len(tracker_groups)
+        # find the number of trackers that have the max score
+        num_max_score_trackers = sum(1 for tracker in self.finetune_results[latest_competition_id].trackers if tracker.score == max_score)
+        if num_max_score_trackers <= 10:
+            for tracker in self.finetune_results[latest_competition_id].trackers:
+                finetune_scores[tracker.uid] = tracker.score
+        else:
+            # group the trackers by if theyre not the same logic. only do this for trackers that have the max score
+            tracker_groups = {}
+            for tracker in self.finetune_results[latest_competition_id].trackers:
+                finetune_scores[tracker.uid] = tracker.score
+                if tracker.score != max_score:
+                    continue
+                # Convert dict to tuple of sorted items for hashing
+                logic_key = tuple(sorted(tracker.logic.items()))
+                if logic_key not in tracker_groups:
+                    tracker_groups[logic_key] = []
+                tracker_groups[logic_key].append(tracker)
+            
+            # Calculate how many trackers to select from each group
+            trackers_per_group = 10 // len(tracker_groups)
+            remainder = 10 % len(tracker_groups)
 
-        # Select trackers from each group
-        selected_trackers = []
-        not_selected_trackers = []
-        for group_trackers in tracker_groups.values():
-            # Get number of trackers to select from this group (including remainder distribution)
-            n_select = trackers_per_group
-            if remainder > 0:
-                n_select += 1
-                remainder -= 1
-                
-            # Randomly select trackers from group
-            group_selected = group_trackers[:n_select] if len(group_trackers) >= n_select else group_trackers
-            selected_trackers.extend(group_selected)
-            not_selected_trackers.extend(group_trackers[n_select:])
-        # Set scores for selected trackers
-        for tracker in selected_trackers:
-            finetune_scores[tracker.uid] = max_score
-        
-        # set scores for not selected trackers to a slighly lower score
-        for tracker in not_selected_trackers:
-            finetune_scores[tracker.uid] = tracker.score - 0.01
+            # Select trackers from each group
+            selected_trackers = []
+            not_selected_trackers = []
+            for group_trackers in tracker_groups.values():
+                # Get number of trackers to select from this group (including remainder distribution)
+                n_select = trackers_per_group
+                if remainder > 0:
+                    n_select += 1
+                    remainder -= 1
+                    
+                # Randomly select trackers from group
+                group_selected = group_trackers[:n_select] if len(group_trackers) >= n_select else group_trackers
+                selected_trackers.extend(group_selected)
+                not_selected_trackers.extend(group_trackers[n_select:])
+            # Set scores for selected trackers
+            for tracker in selected_trackers:
+                finetune_scores[tracker.uid] = max_score
+            
+            # set scores for not selected trackers to a slighly lower score
+            for tracker in not_selected_trackers:
+                finetune_scores[tracker.uid] = tracker.score - 0.01
         
 
         threshold = max_score - 0.17  # within 0.18 of max score
