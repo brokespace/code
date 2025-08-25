@@ -347,7 +347,7 @@ class FinetunePipeline:
 
     @property
     def results(self) -> FinetuneEventResults:
-        return FinetuneEventResults(trackers=self.graded_trackers)
+        return FinetuneEventResults(trackers=self.load_trackers())
 
     def evaluate(self, n_tasks: int = None, store_results: bool = True) -> FinetuneEventResults:
         # gather all logics

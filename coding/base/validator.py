@@ -383,6 +383,8 @@ class BaseValidatorNeuron(BaseNeuron):
         )
         finetune_scores = np.zeros(self.metagraph.n)
         max_score = max(self.finetune_results[latest_competition_id].trackers, key=lambda x: x.score).score
+        for tracker in self.finetune_results[latest_competition_id].trackers:
+            print(f"tracker {tracker.uid} has score {tracker.score}")
         # group the trackers by if theyre not the same logic. only do this for trackers that have the max score
         tracker_groups = {}
         for tracker in self.finetune_results[latest_competition_id].trackers:
