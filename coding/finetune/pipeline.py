@@ -359,174 +359,177 @@ class FinetunePipeline:
         
         print(f"Beginning evaluation of {len(self.tasks)} tasks...")
         for tracker_idx, tracker in enumerate(self.ungraded_trackers):
-            model = self.model_store.upsert(tracker.logic)
-            model.scoring_in_queue = False
-            if model and not model.valid:
-                tracker.score = 0
-                self.graded_trackers.append(tracker)
-                continue
-            
-            model.scoring_in_progress = True
-            
-            api_key = APIKey(tracker.hotkey, self)
-            print(
-                f"Processing tracker {tracker_idx + 1}/{len(self.ungraded_trackers)}"
-            )
-            # Skip if no logic provided
-            if not tracker.logic:
-                print(
-                    f"No logic provided for tracker {tracker.hotkey}, skipping..."
-                )
-                self.graded_trackers.append(tracker)
-                continue
-            if not should_evaluate(tracker, self.metagraph.block):
-                print(
-                    f"Not enough blocks have passed since the last evaluation for tracker {tracker.hotkey}, skipping..."
-                )
-                self.graded_trackers.append(tracker)
-                continue
-
-            previous_tracker = next(
-                (
-                    t
-                    for t in self.graded_trackers
-                    if logic_similar(tracker.logic, t.logic)
-                ),
-                None,
-            )
-            if previous_tracker is not None:
-                if (len(previous_tracker.score_timestamps) > 0):
-                    tracker.score_timestamps = previous_tracker.score_timestamps
-                    print(f"Finetune: Using previously evaluated score for hotkey: {tracker.hotkey}")
-                else:
-                    tracker.score_timestamps.append(self.metagraph.block)
-                tracker.score = previous_tracker.score
-                self.graded_trackers.append(tracker)
-                # if tracker.hotkey != previous_tracker.hotkey:
-                # self.trackers.append(tracker)
-                continue
-
-            # Otherwise, evaluate the logic
             try:
-                print(f"Initializing LLM key for hotkey {tracker.hotkey}...")
-                self.llm_manager.init_key(api_key.key)
-                print(f"Starting docker container for hotkey {tracker.hotkey}...")
-            except Exception as e:
-                bt.logging.error(f"Error initializing LLM key for hotkey {tracker.hotkey}: {e}")
-                print(traceback.format_exc())
-                self.graded_trackers.append(tracker)
-                continue
-            
-            scores = []
-            # Create a thread pool to process tasks in parallel
-            print("Starting thread pool for task processing...")
-            with ThreadPoolExecutor() as executor:
-                print("Thread pool started.")
-
-                def process_task(task_data):
-                    print(f"Processing task...")
-                    task_idx, task = task_data
-                    try:
-                        print(
-                            f"Making request to container for hotkey {tracker.hotkey}, task index {task_idx}, instance id {task.row['instance_id']}"
-                        )
-                        result = run_docker_container_from_base(
-                            image_name=task.image_name,
-                            container_name=f"swe-logic-{str(tracker.hotkey)}-{COMPETITION_ID}-{task_idx}".lower(),
-                            repo=task.repo,
-                            hotkey=tracker.hotkey,
-                            issue_description=task.query,
-                            base_commit=task.row["base_commit"],
-                            logic_files=tracker.logic,
-                            client=(
-                                self.docker_server._remote_client
-                                if self.use_remote
-                                else self.docker_server._local_client
-                            ),
-                            remote_host_url=(
-                                os.getenv("REMOTE_DOCKER_HOST")
-                                if self.use_remote
-                                else None
-                            ),
-                            api_key=api_key.key
-                        )
-                        if "diff" in result:
-                            patch = result['diff']
-                        else:
-                            patch = Patch(**result)
-                        print(
-                            f"Scoring response for hotkey {tracker.hotkey}, task index {task_idx}..."
-                        )
-                        # TODO in the next comp uncomment the below
-                        # score = task.score(patch, self.llm_manager.get_count())
-                        score = task.score(patch)
-                        print(
-                            f"Score for hotkey {tracker.hotkey}, task index {task_idx}: {score}"
-                        )
-                        return score
-                    except Exception as e:
-                        bt.logging.error(
-                            f"Request failed for hotkey {tracker.hotkey}, task index {task_idx}: {e}"
-                        )
-                        print(traceback.format_exc())
-                        return 0
-
-                # Keep track of active futures and tasks
-                active_futures = {}
-                task_queue = list(enumerate(self.tasks))
-                if n_tasks is not None:
-                    task_queue = task_queue[:n_tasks]
-                task_idx = 0
-
-                # Start initial batch of 8 tasks
-                print("Starting initial batch of 8 tasks...")
-                while len(active_futures) < 8 and task_queue:
-                    task_data = task_queue.pop(0)
-                    future = executor.submit(process_task, task_data)
-                    active_futures[future] = task_data
-
+                model = self.model_store.upsert(tracker.logic)
+                model.scoring_in_queue = False
+                if model and not model.valid:
+                    tracker.score = 0
+                    self.graded_trackers.append(tracker)
+                    continue
+                
+                model.scoring_in_progress = True
+                
+                api_key = APIKey(tracker.hotkey, self)
                 print(
-                    f"Task queue drained, active futures left: {len(active_futures)}"
+                    f"Processing tracker {tracker_idx + 1}/{len(self.ungraded_trackers)}"
                 )
-                # Process remaining tasks as others complete
-                while active_futures:
-                    completed_future = next(as_completed(active_futures))
-                    task_data = active_futures.pop(completed_future)
-
-                    # Get score from completed task
-                    score = completed_future.result()
-                    scores.append(score)
+                # Skip if no logic provided
+                if not tracker.logic:
                     print(
-                        f"Average score for hotkey {tracker.hotkey}: {sum(scores) / len(scores)}"
+                        f"No logic provided for tracker {tracker.hotkey}, skipping..."
                     )
-
-                    # Start next task if any remain
-                    if task_queue:
+                    self.graded_trackers.append(tracker)
+                    continue
+                if not should_evaluate(tracker, self.metagraph.block):
+                    print(
+                        f"Not enough blocks have passed since the last evaluation for tracker {tracker.hotkey}, skipping..."
+                    )
+                    self.graded_trackers.append(tracker)
+                    continue
+    
+                previous_tracker = next(
+                    (
+                        t
+                        for t in self.graded_trackers
+                        if logic_similar(tracker.logic, t.logic)
+                    ),
+                    None,
+                )
+                if previous_tracker is not None:
+                    if (len(previous_tracker.score_timestamps) > 0):
+                        tracker.score_timestamps = previous_tracker.score_timestamps
+                        print(f"Finetune: Using previously evaluated score for hotkey: {tracker.hotkey}")
+                    else:
+                        tracker.score_timestamps.append(self.metagraph.block)
+                    tracker.score = previous_tracker.score
+                    self.graded_trackers.append(tracker)
+                    # if tracker.hotkey != previous_tracker.hotkey:
+                    # self.trackers.append(tracker)
+                    continue
+    
+                # Otherwise, evaluate the logic
+                try:
+                    print(f"Initializing LLM key for hotkey {tracker.hotkey}...")
+                    self.llm_manager.init_key(api_key.key)
+                    print(f"Starting docker container for hotkey {tracker.hotkey}...")
+                except Exception as e:
+                    bt.logging.error(f"Error initializing LLM key for hotkey {tracker.hotkey}: {e}")
+                    print(traceback.format_exc())
+                    self.graded_trackers.append(tracker)
+                    continue
+                
+                scores = []
+                # Create a thread pool to process tasks in parallel
+                print("Starting thread pool for task processing...")
+                with ThreadPoolExecutor() as executor:
+                    print("Thread pool started.")
+    
+                    def process_task(task_data):
+                        print(f"Processing task...")
+                        task_idx, task = task_data
+                        try:
+                            print(
+                                f"Making request to container for hotkey {tracker.hotkey}, task index {task_idx}, instance id {task.row['instance_id']}"
+                            )
+                            result = run_docker_container_from_base(
+                                image_name=task.image_name,
+                                container_name=f"swe-logic-{str(tracker.hotkey)}-{COMPETITION_ID}-{task_idx}".lower(),
+                                repo=task.repo,
+                                hotkey=tracker.hotkey,
+                                issue_description=task.query,
+                                base_commit=task.row["base_commit"],
+                                logic_files=tracker.logic,
+                                client=(
+                                    self.docker_server._remote_client
+                                    if self.use_remote
+                                    else self.docker_server._local_client
+                                ),
+                                remote_host_url=(
+                                    os.getenv("REMOTE_DOCKER_HOST")
+                                    if self.use_remote
+                                    else None
+                                ),
+                                api_key=api_key.key
+                            )
+                            if "diff" in result:
+                                patch = result['diff']
+                            else:
+                                patch = Patch(**result)
+                            print(
+                                f"Scoring response for hotkey {tracker.hotkey}, task index {task_idx}..."
+                            )
+                            # TODO in the next comp uncomment the below
+                            # score = task.score(patch, self.llm_manager.get_count())
+                            score = task.score(patch)
+                            print(
+                                f"Score for hotkey {tracker.hotkey}, task index {task_idx}: {score}"
+                            )
+                            return score
+                        except Exception as e:
+                            bt.logging.error(
+                                f"Request failed for hotkey {tracker.hotkey}, task index {task_idx}: {e}"
+                            )
+                            print(traceback.format_exc())
+                            return 0
+    
+                    # Keep track of active futures and tasks
+                    active_futures = {}
+                    task_queue = list(enumerate(self.tasks))
+                    if n_tasks is not None:
+                        task_queue = task_queue[:n_tasks]
+                    task_idx = 0
+    
+                    # Start initial batch of 8 tasks
+                    print("Starting initial batch of 8 tasks...")
+                    while len(active_futures) < 8 and task_queue:
                         task_data = task_queue.pop(0)
                         future = executor.submit(process_task, task_data)
                         active_futures[future] = task_data
-
-                    task_idx += 1
+    
                     print(
-                        f"Completed task {task_idx}/{len(self.tasks)} for hotkey {tracker.hotkey}"
+                        f"Task queue drained, active futures left: {len(active_futures)}"
                     )
-            cost = self.llm_manager.get_cost()
-            self.llm_manager.clear_cost()
-            tracker.avg_cost = cost["cost"] / len(scores)
-            tracker.raw_score = sum(scores) / len(scores)
-            tracker.score = adjust_score_by_cost(tracker.raw_score, tracker.avg_cost)
-            tracker.score_timestamps.append(self.metagraph.block)
-            
-            self.graded_trackers.append(tracker)
-            self.model_store.set_hotkey_scoring_status(tracker.hotkey, False, False)
-            model.score = tracker.score
-            if store_results:
-                self.store_trackers()
-                self.model_store.save()
-            api_key.delete()
-
-            print(f"Cleaning up container for hotkey {tracker.hotkey}...")
-            print(f"Final score for hotkey {tracker.hotkey}: {tracker.score}")
+                    # Process remaining tasks as others complete
+                    while active_futures:
+                        completed_future = next(as_completed(active_futures))
+                        task_data = active_futures.pop(completed_future)
+    
+                        # Get score from completed task
+                        score = completed_future.result()
+                        scores.append(score)
+                        print(
+                            f"Average score for hotkey {tracker.hotkey}: {sum(scores) / len(scores)}"
+                        )
+    
+                        # Start next task if any remain
+                        if task_queue:
+                            task_data = task_queue.pop(0)
+                            future = executor.submit(process_task, task_data)
+                            active_futures[future] = task_data
+    
+                        task_idx += 1
+                        print(
+                            f"Completed task {task_idx}/{len(self.tasks)} for hotkey {tracker.hotkey}"
+                        )
+                cost = self.llm_manager.get_cost()
+                self.llm_manager.clear_cost()
+                tracker.avg_cost = cost["cost"] / len(scores)
+                tracker.raw_score = sum(scores) / len(scores)
+                tracker.score = adjust_score_by_cost(tracker.raw_score, tracker.avg_cost)
+                tracker.score_timestamps.append(self.metagraph.block)
+                
+                self.graded_trackers.append(tracker)
+                self.model_store.set_hotkey_scoring_status(tracker.hotkey, False, False)
+                model.score = tracker.score
+                if store_results:
+                    self.store_trackers()
+                    self.model_store.save()
+                api_key.delete()
+    
+                print(f"Cleaning up container for hotkey {tracker.hotkey}...")
+                print(f"Final score for hotkey {tracker.hotkey}: {tracker.score}")
+            except:
+                pass
 
         print("Evaluation complete!")
         self.model_store.set_all_scoring_status(False, False)
